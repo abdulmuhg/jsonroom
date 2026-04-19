@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { ReactNode, MutableRefObject } from 'react';
 import type { SearchMatch } from '../hooks/useSearch';
 
 interface Props {
@@ -10,6 +10,14 @@ interface Props {
   expandPaths?: Set<string>;
   query?: string;
   caseSensitive?: boolean;
+}
+
+// Mutable counter shared across all <Row> calls in one render pass.
+// Reset to 0 at the top of every JsonView render so line numbers reflect the
+// current tree. This works because React renders synchronously top-to-bottom
+// in this component tree (no Suspense, no concurrent render splits).
+interface LineCounter {
+  value: number;
 }
 
 function typeLabel(v: unknown): string {
@@ -27,13 +35,36 @@ export function JsonView({
   query,
   caseSensitive,
 }: Props) {
+  const lineCounter = useRef<LineCounter>({ value: 0 });
+  // Reset on every render so numbers stay in sync with the tree.
+  lineCounter.current.value = 0;
+
+  // User overrides for per-node open/closed state. A path is absent until the
+  // user explicitly toggles it — then we store the new open/closed boolean.
+  // Lifting this to the root means any toggle re-renders the whole tree,
+  // which is what keeps the mutable line-number counter correct. If we kept
+  // `open` as local state inside each Node, only the toggled subtree would
+  // re-render — sibling rows would keep their stale line numbers.
+  const [userOverrides, setUserOverrides] = useState<Map<string, boolean>>(() => new Map());
+
+  const togglePath = useCallback((path: string, nextOpen: boolean) => {
+    setUserOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(path, nextOpen);
+      return next;
+    });
+  }, []);
+
   return (
-    <div className="font-mono text-[13px] leading-6 scrollbar-thin overflow-auto p-4">
+    <div className="font-mono text-[13px] leading-6 scrollbar-thin overflow-auto">
       <Node
         name={null}
         value={value}
         path=""
         depth={0}
+        lineCounter={lineCounter.current}
+        userOverrides={userOverrides}
+        onTogglePath={togglePath}
         highlightPaths={highlightPaths}
         searchMatches={searchMatches}
         activeMatchPath={activeMatchPath}
@@ -45,11 +76,85 @@ export function JsonView({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Row: every visual line in the tree — opening bracket, primitive, closing
+// bracket — is one <Row>. Owns the line-number gutter on the left.
+// ---------------------------------------------------------------------------
+
+function Row({
+  lineNo,
+  hlClass,
+  children,
+}: {
+  lineNo: number;
+  hlClass?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex group">
+      <div className="w-10 flex-shrink-0 select-none bg-bg-gutter text-right pr-2 text-ink-subtle text-[11px] leading-6">
+        {lineNo}
+      </div>
+      <div className={['flex-1 min-w-0 pl-3 flex items-center', hlClass ?? ''].join(' ')}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Indent: `depth` spacer spans, each with a left border — the indent guides.
+// ---------------------------------------------------------------------------
+
+function Indent({ depth }: { depth: number }) {
+  if (depth === 0) return null;
+  return (
+    <>
+      {Array.from({ length: depth }).map((_, i) => (
+        <span
+          key={i}
+          aria-hidden
+          className="inline-block w-4 flex-shrink-0 border-l border-ink-subtle/30 self-stretch"
+        />
+      ))}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Chevron: slim SVG, rotates 90° when open.
+// ---------------------------------------------------------------------------
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      width={10}
+      height={10}
+      className={['transition-transform', open ? 'rotate-90' : ''].join(' ')}
+      aria-hidden
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="m9 5 7 7-7 7" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Node: recursive tree renderer.
+// ---------------------------------------------------------------------------
+
 interface NodeProps {
   name: string | number | null;
   value: unknown;
   path: string;
   depth: number;
+  lineCounter: LineCounter;
+  userOverrides: Map<string, boolean>;
+  onTogglePath: (path: string, nextOpen: boolean) => void;
   highlightPaths?: Map<string, 'added' | 'removed' | 'changed'>;
   searchMatches?: Map<string, SearchMatch>;
   activeMatchPath?: string;
@@ -64,6 +169,9 @@ function Node({
   value,
   path,
   depth,
+  lineCounter,
+  userOverrides,
+  onTogglePath,
   highlightPaths,
   searchMatches,
   activeMatchPath,
@@ -72,33 +180,75 @@ function Node({
   caseSensitive,
   trailingComma,
 }: NodeProps) {
-  const [open, setOpen] = useState(depth < 2);
   const kind = typeLabel(value);
   const highlight = highlightPaths?.get(path);
   const searchMatch = searchMatches?.get(path);
   const isActiveMatch = activeMatchPath === path;
   const shouldForceExpand = expandPaths?.has(path);
 
-  useEffect(() => {
-    if (shouldForceExpand) setOpen(true);
-  }, [shouldForceExpand]);
+  // Derive open-state with priority: search-force > user override > default.
+  // Default policy: depth < 2 is expanded.
+  const userOverride = userOverrides.get(path);
+  const defaultOpen = depth < 2;
+  const open = shouldForceExpand
+    ? true
+    : userOverride !== undefined
+      ? userOverride
+      : defaultOpen;
 
-  const hlClass = useMemo(() => {
+  const diffClass = useMemo(() => {
     if (!highlight) return '';
-    if (highlight === 'added') return 'bg-diff-addBg border-l-2 border-diff-add pl-1';
-    if (highlight === 'removed') return 'bg-diff-removeBg border-l-2 border-diff-remove pl-1';
-    return 'bg-diff-changeBg border-l-2 border-diff-change pl-1';
+    if (highlight === 'added') return 'bg-diff-addBg border-l-2 border-diff-add';
+    if (highlight === 'removed') return 'bg-diff-removeBg border-l-2 border-diff-remove';
+    return 'bg-diff-changeBg border-l-2 border-diff-change';
   }, [highlight]);
 
-  const indent = { paddingLeft: `${depth * 16}px` };
+  const searchClass = isActiveMatch
+    ? 'bg-search-active border-l-2 border-search-activeBorder'
+    : searchMatch
+      ? 'bg-search-match border-l-2 border-search-matchBorder'
+      : '';
+
+  // Prefer the diff highlight over the search tint visually. If both apply,
+  // the diff border "wins" on the left; the search row highlight still shows
+  // via the background tint.
+  const rowHlClass = [searchClass, diffClass].filter(Boolean).join(' ');
 
   const childProps = {
+    lineCounter,
+    userOverrides,
+    onTogglePath,
     highlightPaths,
     searchMatches,
     activeMatchPath,
     expandPaths,
     query,
     caseSensitive,
+  };
+
+  // Render the key label (unquoted for string keys, [n] for array indices).
+  // Returns null when this is the root node (no key).
+  const renderKey = () => {
+    if (name === null) return null;
+    const keyText = typeof name === 'number' ? `[${name}]` : String(name);
+    const keyColorClass = isActiveMatch ? 'text-ink-primary font-semibold' : 'text-accent-key';
+    return (
+      <>
+        <span className={keyColorClass}>
+          {query && searchMatch?.matchesKey ? (
+            <HighlightText
+              text={keyText}
+              query={query}
+              caseSensitive={caseSensitive ?? false}
+              activeRow={isActiveMatch}
+            />
+          ) : (
+            keyText
+          )}
+        </span>
+        <span className="text-ink-muted mx-1">:</span>
+      </>
+    );
   };
 
   if (kind === 'array' || kind === 'object') {
@@ -109,56 +259,33 @@ function Node({
     const open_br = kind === 'array' ? '[' : '{';
     const close_br = kind === 'array' ? ']' : '}';
 
-    const keyHighlight = searchMatch?.matchesKey;
+    const openingLineNo = ++lineCounter.value;
 
     return (
-      <div className={hlClass} style={indent}>
-        <div
-          className={[
-            'flex items-start rounded-sm',
-            isActiveMatch
-              ? 'bg-search-active border-l-2 border-search-activeBorder pl-1 text-ink-primary'
-              : keyHighlight
-                ? 'bg-search-match border-l-2 border-search-matchBorder pl-1'
-                : '',
-          ].join(' ')}
-        >
+      <>
+        <Row lineNo={openingLineNo} hlClass={rowHlClass}>
+          <Indent depth={depth} />
           <button
-            onClick={() => setOpen((o) => !o)}
-            className="mr-1 -ml-4 w-3 text-ink-muted hover:text-ink-primary"
+            onClick={() => onTogglePath(path, !open)}
+            className="mr-1 flex h-6 w-4 items-center justify-center text-ink-muted hover:text-ink-primary flex-shrink-0"
             aria-label={open ? 'Collapse' : 'Expand'}
           >
-            {open ? '▾' : '▸'}
+            <Chevron open={open} />
           </button>
-          {name !== null && (
-            <>
-              <span className={isActiveMatch ? 'text-ink-primary font-semibold' : 'text-accent-key'}>
-                {query && searchMatch?.matchesKey ? (
-                  <HighlightText
-                    text={typeof name === 'number' ? String(name) : `"${name}"`}
-                    query={query!}
-                    caseSensitive={caseSensitive ?? false}
-                    activeRow={isActiveMatch}
-                  />
-                ) : (
-                  typeof name === 'number' ? name : `"${name}"`
-                )}
-              </span>
-              <span className="text-ink-muted mx-1">:</span>
-            </>
-          )}
+          {renderKey()}
           <span className="text-ink-secondary">{open_br}</span>
           {!open && (
-            <span className="ml-2 text-ink-muted text-[11px] uppercase tracking-wider">
-              {entries.length} {entries.length === 1 ? 'item' : 'items'}
-            </span>
+            <>
+              <span className="ml-2 text-ink-muted text-[11px]">
+                {entries.length} {entries.length === 1 ? 'item' : 'items'}
+              </span>
+              <span className="text-ink-secondary ml-1">
+                {close_br}
+                {trailingComma ? ',' : ''}
+              </span>
+            </>
           )}
-          {!open && (
-            <span className="text-ink-secondary">
-              {close_br}{trailingComma ? ',' : ''}
-            </span>
-          )}
-        </div>
+        </Row>
         {open && (
           <>
             {entries.map(([k, v], idx) => (
@@ -178,56 +305,36 @@ function Node({
                 {...childProps}
               />
             ))}
-            <div style={{ paddingLeft: `${depth * 16}px` }} className="text-ink-secondary">
-              {close_br}{trailingComma ? ',' : ''}
-            </div>
+            <Row lineNo={++lineCounter.value} hlClass={diffClass}>
+              <Indent depth={depth} />
+              <span className="text-ink-secondary ml-5">
+                {close_br}
+                {trailingComma ? ',' : ''}
+              </span>
+            </Row>
           </>
         )}
-      </div>
+      </>
     );
   }
 
   // Primitive row.
+  const primitiveLineNo = ++lineCounter.value;
   return (
-    <div className={[hlClass, 'group flex items-center'].join(' ')} style={indent}>
-      <div
-        className={[
-          'flex flex-1 items-center rounded-sm',
-          isActiveMatch
-            ? 'bg-search-active border-l-2 border-search-activeBorder pl-1'
-            : searchMatch
-              ? 'bg-search-match border-l-2 border-search-matchBorder pl-1'
-              : '',
-        ].join(' ')}
-      >
-        {name !== null && (
-          <>
-            <span className={isActiveMatch ? 'text-ink-primary font-semibold' : 'text-accent-key'}>
-              {query && searchMatch?.matchesKey ? (
-                <HighlightText
-                  text={typeof name === 'number' ? String(name) : `"${name}"`}
-                  query={query!}
-                  caseSensitive={caseSensitive ?? false}
-                  activeRow={isActiveMatch}
-                />
-              ) : (
-                typeof name === 'number' ? name : `"${name}"`
-              )}
-            </span>
-            <span className="text-ink-muted mx-1">:</span>
-          </>
-        )}
-        <PrimitiveValue
-          value={value}
-          query={query}
-          caseSensitive={caseSensitive}
-          matchesValue={searchMatch?.matchesValue}
-          activeRow={isActiveMatch}
-        />
-        {trailingComma && <span className="text-ink-muted">,</span>}
-      </div>
+    <Row lineNo={primitiveLineNo} hlClass={rowHlClass}>
+      <Indent depth={depth} />
+      <span className="mr-1 w-4 flex-shrink-0" aria-hidden />
+      {renderKey()}
+      <PrimitiveValue
+        value={value}
+        query={query}
+        caseSensitive={caseSensitive}
+        matchesValue={searchMatch?.matchesValue}
+        activeRow={isActiveMatch}
+      />
       <CopyButton value={value} />
-    </div>
+      {trailingComma && <span className="text-ink-muted">,</span>}
+    </Row>
   );
 }
 
@@ -278,44 +385,49 @@ function PrimitiveValue({
 
 function CopyButton({ value }: { value: unknown }) {
   const [copied, setCopied] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null> = useRef(null);
 
-  const handleCopy = useCallback(() => {
-    const text =
-      value === null
-        ? 'null'
-        : typeof value === 'string'
-          ? value
-          : String(value);
+  const handleCopy = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const text =
+        value === null
+          ? 'null'
+          : typeof value === 'string'
+            ? value
+            : String(value);
 
-    navigator.clipboard.writeText(text).catch(() => {
-      const el = document.createElement('textarea');
-      el.value = text;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-    });
+      navigator.clipboard.writeText(text).catch(() => {
+        const el = document.createElement('textarea');
+        el.value = text;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      });
 
-    setCopied(true);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => setCopied(false), 1500);
-  }, [value]);
+      setCopied(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setCopied(false), 1500);
+    },
+    [value],
+  );
 
   return (
     <button
       onClick={handleCopy}
       aria-label="Copy value"
-      className="ml-2 opacity-0 group-hover:opacity-100 text-ink-muted hover:text-ink-primary transition-opacity"
+      title="Copy value"
+      className="ml-2 opacity-0 group-hover:opacity-100 text-ink-muted hover:text-ink-primary transition-opacity flex-shrink-0"
     >
       {copied ? (
         // Check icon
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" width={13} height={13}>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" width={12} height={12}>
           <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
         </svg>
       ) : (
         // Clipboard icon
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" width={13} height={13}>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" width={12} height={12}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
         </svg>
       )}

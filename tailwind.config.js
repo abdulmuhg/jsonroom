@@ -5,18 +5,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // JSONPeek presentation-friendly dark palette
+        // UI chrome — cool blue-gray neutrals (JSON.site-inspired).
         bg: {
-          base: '#0E1116',
-          panel: '#1A1F28',
-          elev: '#232935',
-          hover: '#2A3140',
+          base: '#1a1e26',      // outer canvas, deeper cool gray
+          panel: '#22272f',     // pane / toolbar background
+          elev: '#2c323b',      // borders, elevated chips
+          hover: '#343a44',     // button hover
+          gutter: '#1e232b',    // line-number gutter bg
         },
         ink: {
-          primary: '#E8EAED',
-          secondary: '#B8BDC7',
-          muted: '#8B93A0',
-          subtle: '#5C6470',
+          primary: '#d8dde5',   // body text — slightly cooler than before
+          secondary: '#a8b0bc', // secondary labels
+          muted: '#7a8390',     // metadata, keys in muted state
+          subtle: '#4e5662',    // placeholder, line numbers, indent guides
         },
         accent: {
           key: '#E07B4F',      // orange — JSON keys
