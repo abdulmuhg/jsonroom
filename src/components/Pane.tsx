@@ -68,7 +68,7 @@ export function Pane({ label, raw, onChange, diffEntries, diffSide }: Props) {
         <textarea
           value={raw}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Paste JSON here…  (Grafana log lines and escaped strings are auto-cleaned)"
+          placeholder="The room is quiet. Paste some JSON to break the silence…  (Grafana logs and escaped strings are auto-cleaned)"
           className="flex-1 resize-none bg-bg-base p-4 font-mono text-[13px] leading-6 text-ink-primary placeholder:text-ink-subtle focus:outline-none scrollbar-thin"
         />
       ) : parsed.ok ? (

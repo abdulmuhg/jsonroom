@@ -1,17 +1,43 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { TabBar } from './components/TabBar';
 import { Toolbar } from './components/Toolbar';
 import { Pane } from './components/Pane';
+import { Intro } from './components/Intro';
 import { useTabs } from './hooks/useTabs';
 import { parseJson } from './lib/parseJson';
 import { diffJson } from './lib/diff';
 
+const INTRO_SEEN_KEY = 'jsonroom.introSeen.v1';
+
+function shouldShowIntro(): boolean {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('intro') === '1') return true;
+  if (params.get('intro') === '0') return false;
+  try {
+    return localStorage.getItem(INTRO_SEEN_KEY) !== '1';
+  } catch {
+    return false;
+  }
+}
+
 export default function App() {
   const { tabs, activeId, activeTab, addTab, closeTab, updateTab, setActive } = useTabs();
+  const [showIntro, setShowIntro] = useState<boolean>(() => shouldShowIntro());
+
+  const dismissIntro = () => {
+    setShowIntro(false);
+    try {
+      localStorage.setItem(INTRO_SEEN_KEY, '1');
+    } catch {
+      // Ignore.
+    }
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (showIntro) return; // Intro handles its own keys.
       const meta = e.metaKey || e.ctrlKey;
       if (!meta) return;
       if (e.key === 't') {
@@ -29,7 +55,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeId, activeTab, addTab, closeTab, updateTab]);
+  }, [activeId, activeTab, addTab, closeTab, updateTab, showIntro]);
 
   const diffEntries = useMemo(() => {
     if (activeTab.mode !== 'compare') return [];
@@ -45,9 +71,9 @@ export default function App() {
       <header className="flex items-center justify-between border-b border-bg-elev bg-bg-panel px-4 py-2">
         <div className="flex items-center gap-2">
           <span className="font-mono text-accent-key font-bold text-lg">{'{ }'}</span>
-          <span className="font-semibold text-ink-primary">JSONPeek</span>
+          <span className="font-semibold text-ink-primary">JSONRoom</span>
           <span className="text-[11px] uppercase tracking-wider text-ink-muted">
-            clean JSON viewer &amp; diff
+            a quiet room for your JSON
           </span>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-ink-muted">
@@ -55,11 +81,18 @@ export default function App() {
           <span>new tab</span>
           <kbd className="rounded bg-bg-elev px-1.5 py-0.5 font-mono">⌘D</kbd>
           <span>compare</span>
+          <button
+            onClick={() => setShowIntro(true)}
+            className="ml-3 text-ink-muted hover:text-accent-key"
+            title="Replay intro"
+          >
+            meet Mr. J
+          </button>
           <a
             href="https://abdulmughnialfikri.com"
             target="_blank"
             rel="noreferrer"
-            className="ml-3 text-ink-muted hover:text-accent-key"
+            className="text-ink-muted hover:text-accent-key"
           >
             abdulmughnialfikri.com
           </a>
@@ -107,6 +140,8 @@ export default function App() {
           </>
         )}
       </main>
+
+      {showIntro && <Intro onDismiss={dismissIntro} />}
     </div>
   );
 }

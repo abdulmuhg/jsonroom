@@ -1,9 +1,9 @@
 {
-  "name": "jsonpeek",
+  "name": "jsonroom",
   "version": "0.1.0",
   "private": false,
   "type": "module",
-  "description": "A clean, ad-free JSON viewer and diff tool for debugging API responses",
+  "description": "A quiet, ad-free room for your JSON — viewer and diff tool for debugging API responses",
   "author": "Abdul Mughni Alfikri",
   "license": "MIT",
   "homepage": "https://json.abdulmughnialfikri.com",
