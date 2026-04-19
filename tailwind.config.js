@@ -32,6 +32,14 @@ export default {
           change: '#B8864A',
           changeBg: 'rgba(184, 134, 74, 0.18)',
         },
+        search: {
+          // Non-active matches: visible but subtle gold tint.
+          match: 'rgba(232, 192, 125, 0.18)',
+          matchBorder: 'rgba(232, 192, 125, 0.45)',
+          // Active match: darker, saturated background so JSON text stays readable.
+          active: 'rgba(140, 95, 30, 0.55)',
+          activeBorder: '#E8C07D',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

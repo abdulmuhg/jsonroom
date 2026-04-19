@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TabBar } from './components/TabBar';
-import { Toolbar } from './components/Toolbar';
 import { Pane } from './components/Pane';
 import { Intro } from './components/Intro';
 import { useTabs } from './hooks/useTabs';
@@ -105,17 +104,7 @@ export default function App() {
         onSelect={setActive}
         onClose={closeTab}
         onAdd={addTab}
-      />
-
-      <Toolbar
-        tab={activeTab}
-        diffCount={diffEntries.length}
-        onToggleMode={() =>
-          updateTab(activeId, {
-            mode: activeTab.mode === 'compare' ? 'single' : 'compare',
-          })
-        }
-        onRename={(name) => updateTab(activeId, { name })}
+        onRename={(id, name) => updateTab(id, { name })}
       />
 
       {/* Panes */}
@@ -126,6 +115,14 @@ export default function App() {
           onChange={(raw) => updateTab(activeId, { leftRaw: raw })}
           diffEntries={activeTab.mode === 'compare' ? diffEntries : undefined}
           diffSide="left"
+          showCompareButton
+          isCompareMode={activeTab.mode === 'compare'}
+          onToggleCompare={() =>
+            updateTab(activeId, {
+              mode: activeTab.mode === 'compare' ? 'single' : 'compare',
+            })
+          }
+          diffCount={diffEntries.length}
         />
         {activeTab.mode === 'compare' && (
           <>
