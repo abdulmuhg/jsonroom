@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useRef, useMemo, useState } from 'react';
 import { approximateSize, countKeys, parseJson } from '../lib/parseJson';
 import { JsonView } from './JsonView';
 import { SearchBar } from './SearchBar';
@@ -33,6 +33,26 @@ export function Pane({
   const parsed = useMemo(() => parseJson(raw), [raw]);
 
   const search = useSearch(parsed.ok ? parsed.value : null);
+
+  // "Copy all" state
+  const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCopyAll = useCallback(() => {
+    if (!parsed.ok) return;
+    const text = JSON.stringify(parsed.value, null, 2);
+    navigator.clipboard.writeText(text).catch(() => {
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    });
+    setCopied(true);
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
+  }, [parsed]);
 
   const highlightPaths = useMemo(() => {
     if (!diffEntries) return undefined;
@@ -91,6 +111,29 @@ export function Pane({
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" width={14} height={14}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
             </svg>
+          </button>
+          {/* Copy all JSON button */}
+          <button
+            onClick={handleCopyAll}
+            disabled={!parsed.ok}
+            aria-label="Copy all JSON"
+            title="Copy all JSON"
+            className={[
+              'flex h-7 w-7 items-center justify-center rounded transition-colors',
+              copied
+                ? 'text-accent-key'
+                : 'text-ink-muted hover:bg-bg-hover hover:text-ink-primary disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-ink-muted',
+            ].join(' ')}
+          >
+            {copied ? (
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" width={14} height={14}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" width={14} height={14}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+              </svg>
+            )}
           </button>
           {/* Format button (three horizontal lines — list-bullet style, reads as "tidy") */}
           <button
@@ -161,7 +204,46 @@ export function Pane({
           className="flex-1 resize-none bg-bg-base p-4 font-mono text-[13px] leading-6 text-ink-primary placeholder:text-ink-subtle focus:outline-none scrollbar-thin"
         />
       ) : parsed.ok ? (
-        <div className="flex-1 min-h-0 overflow-auto">
+        <div
+          className="flex-1 min-h-0 overflow-auto"
+          onCopy={(e) => {
+            // Intercept copy to produce clean JSON instead of messy HTML selection
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed) return;
+
+            // Get the raw selected text and clean it up:
+            // - Remove line numbers (digits at start of lines)
+            // - Remove extra whitespace from flex layout artifacts
+            const rawSelection = selection.toString();
+            const lines = rawSelection.split('\n');
+            const cleaned = lines
+              .map((line) => line.replace(/^\s*\d+\s*/, ''))  // strip line numbers
+              .filter((line, i) => !(line.trim() === '' && i > 0 && lines[i - 1]?.trim() === ''))  // collapse blank lines
+              .join('\n')
+              .trim();
+
+            // If the selection covers the entire JSON (heuristic: starts with { or [
+            // and ends with } or ]), try to provide perfectly formatted output
+            const trimmed = cleaned.trim();
+            if (
+              (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+              (trimmed.startsWith('[') && trimmed.endsWith(']'))
+            ) {
+              try {
+                const reparsed = JSON.parse(trimmed);
+                e.clipboardData.setData('text/plain', JSON.stringify(reparsed, null, 2));
+                e.preventDefault();
+                return;
+              } catch {
+                // Fall through to cleaned text
+              }
+            }
+
+            // For partial selections, provide the cleaned-up text
+            e.clipboardData.setData('text/plain', cleaned);
+            e.preventDefault();
+          }}
+        >
           <JsonView
             value={parsed.value}
             highlightPaths={highlightPaths}

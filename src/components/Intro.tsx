@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 
 interface Props {
   onDismiss: () => void;
@@ -7,24 +8,33 @@ interface Props {
 interface Line {
   speaker: string;
   text: string;
+  /** Optional rich render — when provided, displayed instead of `text` once typing finishes. */
+  richContent?: ReactNode;
 }
 
+const REPO_URL = 'https://github.com/abdulmuhg/jsonroom';
+
 const SCRIPT: Line[] = [
-  { speaker: '???', text: '*knock knock*' },
-  { speaker: '???', text: 'Uhh… excuse me. Is this the Jason room?' },
-  { speaker: 'Mr. J', text: 'Close — but this is the JSON Room.' },
-  { speaker: 'Mr. J', text: "Come on in. I'll hold your payloads." },
+  { speaker: '???', text: '*knock knock* — is this the Jason Room?' },
+  { speaker: 'Mr. J', text: "Sorry, this is not the Jason Room. It's the JSON Room. Paste anything — messy logs, escaped strings, raw API responses. I'll sort them out." },
   {
     speaker: 'Mr. J',
-    text: 'Paste messy logs, escaped strings, whole Grafana responses — I\'ll clean them up.',
-  },
-  {
-    speaker: 'Mr. J',
-    text: 'Open as many tabs as you need. Hit ⌘D to compare two payloads side-by-side.',
-  },
-  {
-    speaker: 'Mr. J',
-    text: "Oh — and this place is built by Abdul. Fork it, star it, or just use it. No ads, no sign-up, ever.",
+    text: 'Built by Mr. A — want to try it yourself? Check out the repo at github.com/abdulmuhg/jsonroom. Star it if you like it!',
+    richContent: (
+      <>
+        Built by Mr. A — want to try it yourself? Check out the repo at{' '}
+        <a
+          href={REPO_URL}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-accent-key underline underline-offset-2 hover:text-accent-string transition-colors"
+        >
+          github.com/abdulmuhg/jsonroom
+        </a>
+        . Star it if you like it!
+      </>
+    ),
   },
 ];
 
@@ -132,10 +142,16 @@ export function Intro({ onDismiss }: Props) {
       <img
         src="/door-scene.png"
         alt=""
-        className="absolute inset-0 h-full w-full object-cover object-[center_30%] opacity-30 pointer-events-none select-none md:object-contain md:object-bottom md:opacity-25"
+        className={[
+          'absolute inset-0 h-full w-full object-cover object-[center_30%] pointer-events-none select-none md:object-contain md:object-bottom transition-opacity duration-700',
+          index === 0 ? 'opacity-0' : 'opacity-30 md:opacity-25',
+        ].join(' ')}
       />
       {/* Vignette to push background further back */}
-      <div className="absolute inset-0 bg-gradient-to-t from-bg-base via-transparent to-bg-base/40 pointer-events-none" />
+      <div className={[
+        'absolute inset-0 bg-gradient-to-t from-bg-base via-transparent to-bg-base/40 pointer-events-none transition-opacity duration-700',
+        index === 0 ? 'opacity-0' : 'opacity-100',
+      ].join(' ')} />
 
       {/* Top bar */}
       <div className="relative z-10 flex items-center justify-between px-4 pt-4">
@@ -179,7 +195,7 @@ export function Intro({ onDismiss }: Props) {
             </div>
             <div className="min-h-[80px] px-5 py-4 sm:min-h-[96px] sm:px-6 sm:py-5">
               <p className="text-base leading-relaxed text-ink-primary sm:text-lg">
-                {shown}
+                {done && line.richContent ? line.richContent : shown}
                 <span
                   className={
                     'ml-0.5 inline-block h-5 w-2 align-middle bg-ink-primary ' +

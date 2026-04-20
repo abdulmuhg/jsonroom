@@ -285,6 +285,7 @@ function Node({
               </span>
             </>
           )}
+          <CopyButton value={value} block />
         </Row>
         {open && (
           <>
@@ -383,7 +384,7 @@ function PrimitiveValue({
   return <span className={colorClass}>{rawText}</span>;
 }
 
-function CopyButton({ value }: { value: unknown }) {
+function CopyButton({ value, block }: { value: unknown; block?: boolean }) {
   const [copied, setCopied] = useState(false);
   const timeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null> = useRef(null);
 
@@ -391,11 +392,13 @@ function CopyButton({ value }: { value: unknown }) {
     (e: React.MouseEvent) => {
       e.stopPropagation();
       const text =
-        value === null
-          ? 'null'
-          : typeof value === 'string'
-            ? value
-            : String(value);
+        block || typeof value === 'object'
+          ? JSON.stringify(value, null, 2)
+          : value === null
+            ? 'null'
+            : typeof value === 'string'
+              ? value
+              : String(value);
 
       navigator.clipboard.writeText(text).catch(() => {
         const el = document.createElement('textarea');
@@ -410,14 +413,14 @@ function CopyButton({ value }: { value: unknown }) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => setCopied(false), 1500);
     },
-    [value],
+    [value, block],
   );
 
   return (
     <button
       onClick={handleCopy}
-      aria-label="Copy value"
-      title="Copy value"
+      aria-label={block ? 'Copy block' : 'Copy value'}
+      title={block ? 'Copy block' : 'Copy value'}
       className="ml-2 opacity-0 group-hover:opacity-100 text-ink-muted hover:text-ink-primary transition-opacity flex-shrink-0"
     >
       {copied ? (

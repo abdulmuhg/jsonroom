@@ -39,10 +39,7 @@ export default function App() {
       if (showIntro) return; // Intro handles its own keys.
       const meta = e.metaKey || e.ctrlKey;
       if (!meta) return;
-      if (e.key === 't') {
-        e.preventDefault();
-        addTab();
-      } else if (e.key === 'w') {
+      if (e.key === 'w') {
         e.preventDefault();
         closeTab(activeId);
       } else if (e.key === 'd') {
@@ -68,17 +65,20 @@ export default function App() {
     <div className="flex h-screen flex-col">
       {/* Header */}
       <header className="flex items-center justify-between border-b border-bg-elev bg-bg-panel px-4 py-2">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-accent-key font-bold text-lg">{'{ }'}</span>
-          <span className="font-semibold text-ink-primary">JSONRoom</span>
-          <span className="text-[11px] uppercase tracking-wider text-ink-muted">
-            a quiet room for your JSON
-          </span>
+        <div className="flex items-center gap-2.5">
+          {/* Brand mark — mirrors favicon.svg */}
+          <svg width="22" height="22" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect width="32" height="32" rx="8" fill="#1a1e26"/>
+            <path d="M13.5 7.5H12C10.3 7.5 9.5 8.4 9.5 10v3.5c0 .9-.35 1.3-.9 1.5v1c.55.2.9.6.9 1.5V21c0 1.6.8 2.5 2.5 2.5h1.5" stroke="#E07B4F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M18.5 7.5H20c1.7 0 2.5.9 2.5 2.5v3.5c0 .9.35 1.3.9 1.5v1c-.55.2-.9.6-.9 1.5V21c0 1.6-.8 2.5-2.5 2.5h-1.5" stroke="#E07B4F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="16" cy="16" r="1.6" fill="#E8C07D"/>
+          </svg>
+          <span className="font-semibold tracking-tight text-ink-primary">JSONRoom</span>
+          <span className="hidden sm:inline text-[11px] text-ink-subtle">·</span>
+          <span className="hidden sm:inline text-[11px] text-ink-subtle">a quiet room for your JSON</span>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-ink-muted">
-          <kbd className="rounded bg-bg-elev px-1.5 py-0.5 font-mono">⌘T</kbd>
-          <span>new tab</span>
-          <kbd className="rounded bg-bg-elev px-1.5 py-0.5 font-mono">⌘D</kbd>
+          <kbd className="rounded bg-bg-elev px-1.5 py-0.5 font-mono">Ctrl+D</kbd>
           <span>compare</span>
           <button
             onClick={() => setShowIntro(true)}
@@ -88,12 +88,12 @@ export default function App() {
             meet Mr. J
           </button>
           <a
-            href="https://abdulmughnialfikri.com"
+            href="https://github.com/abdulmuhg/jsonroom"
             target="_blank"
             rel="noreferrer"
             className="text-ink-muted hover:text-accent-key"
           >
-            abdulmughnialfikri.com
+            contribute
           </a>
         </div>
       </header>
