@@ -78,8 +78,6 @@ export default function App() {
           <span className="hidden sm:inline text-[11px] text-ink-subtle">a quiet room for your JSON</span>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-ink-muted">
-          <kbd className="rounded bg-bg-elev px-1.5 py-0.5 font-mono">Ctrl+D</kbd>
-          <span>compare</span>
           <button
             onClick={() => setShowIntro(true)}
             className="ml-3 text-ink-muted hover:text-accent-key"

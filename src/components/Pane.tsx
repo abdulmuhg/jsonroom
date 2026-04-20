@@ -1,5 +1,6 @@
 import { useCallback, useRef, useMemo, useState } from 'react';
 import { approximateSize, countKeys, parseJson } from '../lib/parseJson';
+import { repairJson } from '../lib/repairJson';
 import { JsonView } from './JsonView';
 import { SearchBar } from './SearchBar';
 import { useSearch } from '../hooks/useSearch';
@@ -53,6 +54,25 @@ export function Pane({
     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     copyTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
   }, [parsed]);
+
+  // "Fix JSON" state
+  const [fixMessage, setFixMessage] = useState<string | null>(null);
+  const fixTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleFix = useCallback(() => {
+    const result = repairJson(raw);
+    if (result.ok) {
+      onChange(result.result);
+      const msg = result.fixes.length > 0
+        ? `Fixed: ${result.fixes.join(', ').toLowerCase()}`
+        : 'JSON is already valid';
+      setFixMessage(msg);
+    } else {
+      setFixMessage('Could not repair — too broken');
+    }
+    if (fixTimeoutRef.current) clearTimeout(fixTimeoutRef.current);
+    fixTimeoutRef.current = setTimeout(() => setFixMessage(null), 3000);
+  }, [raw, onChange]);
 
   const highlightPaths = useMemo(() => {
     if (!diffEntries) return undefined;
@@ -149,6 +169,23 @@ export function Pane({
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
+          {/* Fix JSON button (wrench icon) — only enabled when parse fails */}
+          <button
+            onClick={handleFix}
+            disabled={parsed.ok || raw.trim() === ''}
+            aria-label="Fix JSON"
+            title="Attempt to fix broken JSON"
+            className={[
+              'flex h-7 w-7 items-center justify-center rounded transition-colors',
+              !parsed.ok && raw.trim() !== ''
+                ? 'text-diff-remove hover:bg-diff-removeBg hover:text-ink-primary animate-pulse'
+                : 'text-ink-muted disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-ink-muted',
+            ].join(' ')}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" width={14} height={14}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085" />
+            </svg>
+          </button>
           {/* Clear button (trash icon) */}
           <button
             onClick={() => onChange('')}
@@ -193,6 +230,16 @@ export function Pane({
           onPrev={search.goPrev}
           onClose={search.close}
         />
+      )}
+
+      {/* Fix message banner */}
+      {fixMessage && (
+        <div className="flex items-center gap-2 border-b border-accent-key/30 bg-accent-key/10 px-4 py-1.5 text-xs text-accent-key">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width={12} height={12}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085" />
+          </svg>
+          {fixMessage}
+        </div>
       )}
 
       {/* Content */}
@@ -256,8 +303,19 @@ export function Pane({
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-auto">
-          <div className="border-b border-diff-remove bg-diff-removeBg px-4 py-2 text-sm text-diff-remove">
-            <span className="font-semibold">Parse error:</span> {parsed.error}
+          <div className="border-b border-diff-remove bg-diff-removeBg px-4 py-2 text-sm text-diff-remove flex items-center justify-between gap-3">
+            <span>
+              <span className="font-semibold">Parse error:</span> {parsed.error}
+            </span>
+            <button
+              onClick={handleFix}
+              className="flex items-center gap-1.5 rounded bg-accent-key/15 px-2.5 py-1 text-xs font-medium text-accent-key hover:bg-accent-key/25 transition-colors flex-shrink-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width={12} height={12}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085" />
+              </svg>
+              Fix it
+            </button>
           </div>
           <textarea
             value={raw}
