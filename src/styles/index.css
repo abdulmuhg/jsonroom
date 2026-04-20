@@ -2,6 +2,138 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+ * Theme tokens
+ *
+ * Three themes:
+ *   :root / [data-theme="default"]  — original cool blue-gray with warm accents
+ *   [data-theme="dark"]             — Claude-inspired warm stone
+ *   [data-theme="light"]            — Claude-inspired warm cream paper
+ *
+ * Tokens are referenced via CSS variables by tailwind.config.js.
+ * ------------------------------------------------------------------------- */
+
+:root,
+[data-theme='default'] {
+  /* UI chrome — cool blue-gray neutrals (JSON.site-inspired). */
+  --color-bg-base: #1a1e26;
+  --color-bg-panel: #22272f;
+  --color-bg-elev: #2c323b;
+  --color-bg-hover: #343a44;
+  --color-bg-gutter: #1e232b;
+
+  --color-ink-primary: #d8dde5;
+  --color-ink-secondary: #a8b0bc;
+  --color-ink-muted: #7a8390;
+  --color-ink-subtle: #4e5662;
+
+  /* Accents — syntax highlighting. Kept consistent across themes as brand. */
+  --color-accent-key: #e07b4f;
+  --color-accent-string: #e8c07d;
+  --color-accent-number: #9cdcfe;
+  --color-accent-bool: #d47b7b;
+
+  --color-diff-add: #4a7c59;
+  --color-diff-add-bg: rgba(74, 124, 89, 0.18);
+  --color-diff-remove: #8b4949;
+  --color-diff-remove-bg: rgba(139, 73, 73, 0.18);
+  --color-diff-change: #b8864a;
+  --color-diff-change-bg: rgba(184, 134, 74, 0.18);
+
+  --color-search-match: rgba(232, 192, 125, 0.18);
+  --color-search-match-border: rgba(232, 192, 125, 0.45);
+  --color-search-active: rgba(140, 95, 30, 0.55);
+  --color-search-active-border: #e8c07d;
+
+  /* Non-token style hooks consumed directly (selection, scrollbar). */
+  --selection-bg: rgba(224, 123, 79, 0.35);
+  --scrollbar-thumb: #2a3140;
+  --scrollbar-thumb-hover: #3a4254;
+
+  color-scheme: dark;
+}
+
+[data-theme='dark'] {
+  /* Claude-inspired warm stone with a seafoam-teal syntax palette. */
+  --color-bg-base: #262624;
+  --color-bg-panel: #1f1e1d;
+  --color-bg-elev: #30302e;
+  --color-bg-hover: #3a3937;
+  --color-bg-gutter: #1f1e1d;
+
+  --color-ink-primary: #f5f4ed;
+  --color-ink-secondary: #c2c0b6;
+  --color-ink-muted: #888680;
+  --color-ink-subtle: #5a5955;
+
+  /* Syntax accents — teal/seafoam as the signature. */
+  --color-accent-key: #6fb0a4;     /* seafoam teal (the star) */
+  --color-accent-string: #c9a76f;  /* warm amber */
+  --color-accent-number: #d48a7b;  /* muted coral */
+  --color-accent-bool: #c98b8b;    /* dusty rose */
+
+  --color-diff-add: #5a8a6a;
+  --color-diff-add-bg: rgba(90, 138, 106, 0.16);
+  --color-diff-remove: #a67373;
+  --color-diff-remove-bg: rgba(166, 115, 115, 0.16);
+  --color-diff-change: #b8945a;
+  --color-diff-change-bg: rgba(184, 148, 90, 0.16);
+
+  --color-search-match: rgba(201, 167, 111, 0.18);
+  --color-search-match-border: rgba(201, 167, 111, 0.45);
+  --color-search-active: rgba(155, 110, 60, 0.55);
+  --color-search-active-border: #c9a76f;
+
+  --selection-bg: rgba(111, 176, 164, 0.32);
+  --scrollbar-thumb: #3a3937;
+  --scrollbar-thumb-hover: #4a4947;
+
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  /* Warm cream paper base with a classic IDE syntax palette for strong
+     hue separation between each JSON category. */
+  --color-bg-base: #faf9f5;
+  --color-bg-panel: #f5f4ed;
+  --color-bg-elev: #e8e6db;
+  --color-bg-hover: #dedccf;
+  --color-bg-gutter: #f0eee4;
+
+  --color-ink-primary: #262624;
+  --color-ink-secondary: #4a4947;
+  --color-ink-muted: #706f6b;
+  --color-ink-subtle: #a8a69b;
+
+  /* Syntax accents — GitHub-style high-saturation palette. Each category
+     sits in a distinct hue so keys/strings/numbers/booleans are instantly
+     distinguishable on the cream background. */
+  --color-accent-key: #7b2589;     /* purple-magenta */
+  --color-accent-string: #22863a;  /* forest green */
+  --color-accent-number: #005cc5;  /* azure blue */
+  --color-accent-bool: #d73a49;    /* crimson */
+
+  --color-diff-add: #1a7f37;
+  --color-diff-add-bg: rgba(26, 127, 55, 0.12);
+  --color-diff-remove: #cf222e;
+  --color-diff-remove-bg: rgba(207, 34, 46, 0.10);
+  --color-diff-change: #9a6700;
+  --color-diff-change-bg: rgba(154, 103, 0, 0.12);
+
+  /* Search uses amber (independent of syntax accents) so highlights read
+     as 'highlight', not as syntax. */
+  --color-search-match: rgba(240, 200, 60, 0.30);
+  --color-search-match-border: rgba(180, 140, 20, 0.55);
+  --color-search-active: rgba(255, 190, 40, 0.55);
+  --color-search-active-border: #b38600;
+
+  --selection-bg: rgba(123, 37, 137, 0.18);
+  --scrollbar-thumb: #c2c0b6;
+  --scrollbar-thumb-hover: #a8a69b;
+
+  color-scheme: light;
+}
+
 @layer base {
   html,
   body,
@@ -13,25 +145,25 @@
     font-feature-settings: 'cv11', 'ss01';
   }
   *::selection {
-    background: rgba(224, 123, 79, 0.35);
+    background: var(--selection-bg);
   }
 }
 
 @layer components {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: #2A3140 transparent;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: #2A3140;
+    background-color: var(--scrollbar-thumb);
     border-radius: 6px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: #3A4254;
+    background-color: var(--scrollbar-thumb-hover);
   }
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;

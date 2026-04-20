@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { TabBar } from './components/TabBar';
 import { Pane } from './components/Pane';
 import { Intro } from './components/Intro';
+import { ThemeSwitcher } from './components/ThemeSwitcher';
 import { useTabs } from './hooks/useTabs';
+import { useTheme } from './hooks/useTheme';
 import { parseJson } from './lib/parseJson';
 import { diffJson } from './lib/diff';
 
@@ -22,6 +24,7 @@ function shouldShowIntro(): boolean {
 
 export default function App() {
   const { tabs, activeId, activeTab, addTab, closeTab, updateTab, setActive } = useTabs();
+  const { theme, setTheme } = useTheme();
   const [showIntro, setShowIntro] = useState<boolean>(() => shouldShowIntro());
 
   const dismissIntro = () => {
@@ -66,12 +69,12 @@ export default function App() {
       {/* Header */}
       <header className="flex items-center justify-between border-b border-bg-elev bg-bg-panel px-4 py-2">
         <div className="flex items-center gap-2.5">
-          {/* Brand mark — mirrors favicon.svg */}
+          {/* Brand mark — mirrors favicon.svg. Colors follow the active theme. */}
           <svg width="22" height="22" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <rect width="32" height="32" rx="8" fill="#1a1e26"/>
-            <path d="M13.5 7.5H12C10.3 7.5 9.5 8.4 9.5 10v3.5c0 .9-.35 1.3-.9 1.5v1c.55.2.9.6.9 1.5V21c0 1.6.8 2.5 2.5 2.5h1.5" stroke="#E07B4F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M18.5 7.5H20c1.7 0 2.5.9 2.5 2.5v3.5c0 .9.35 1.3.9 1.5v1c-.55.2-.9.6-.9 1.5V21c0 1.6-.8 2.5-2.5 2.5h-1.5" stroke="#E07B4F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx="16" cy="16" r="1.6" fill="#E8C07D"/>
+            <rect width="32" height="32" rx="8" className="fill-bg-base" />
+            <path d="M13.5 7.5H12C10.3 7.5 9.5 8.4 9.5 10v3.5c0 .9-.35 1.3-.9 1.5v1c.55.2.9.6.9 1.5V21c0 1.6.8 2.5 2.5 2.5h1.5" className="stroke-accent-key" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M18.5 7.5H20c1.7 0 2.5.9 2.5 2.5v3.5c0 .9.35 1.3.9 1.5v1c-.55.2-.9.6-.9 1.5V21c0 1.6-.8 2.5-2.5 2.5h-1.5" className="stroke-accent-key" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="16" cy="16" r="1.6" className="fill-accent-string" />
           </svg>
           <span className="font-semibold tracking-tight text-ink-primary">JSONRoom</span>
           <span className="hidden sm:inline text-[11px] text-ink-subtle">·</span>
@@ -93,6 +96,7 @@ export default function App() {
           >
             contribute
           </a>
+          <ThemeSwitcher theme={theme} onChange={setTheme} />
         </div>
       </header>
 

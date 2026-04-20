@@ -12,18 +12,92 @@ interface Props {
   caseSensitive?: boolean;
 }
 
-// Mutable counter shared across all <Row> calls in one render pass.
-// Reset to 0 at the top of every JsonView render so line numbers reflect the
-// current tree. This works because React renders synchronously top-to-bottom
-// in this component tree (no Suspense, no concurrent render splits).
-interface LineCounter {
-  value: number;
+// ---------------------------------------------------------------------------
+// Line-number pre-pass
+//
+// We compute every row's 1-based line number in a single deterministic walk
+// of the parsed value *before* rendering. This is in contrast to a tempting
+// mutable-counter-during-render approach, which breaks in two ways:
+//   1. A container's closing brace JSX is created before its children are
+//      rendered by React, so incrementing in render order gives the closing
+//      brace a too-small number.
+//   2. React.StrictMode invokes function components twice in dev, so any
+//      ref-based counter mutated in render is incremented twice per row.
+// Moving the counter out of render removes both footguns.
+// ---------------------------------------------------------------------------
+interface LineInfo {
+  opening: number;
+  /** Only present for containers that are open and therefore have their
+   *  closing brace on its own row. Closed containers render their brace
+   *  inline on the opening row and have no separate closing line. */
+  closing?: number;
 }
 
 function typeLabel(v: unknown): string {
   if (v === null) return 'null';
   if (Array.isArray(v)) return 'array';
   return typeof v;
+}
+
+/** Path resolution matches the Node component exactly — keep in sync. */
+function childPath(
+  parentPath: string,
+  key: string | number,
+  parentKind: 'array' | 'object',
+): string {
+  if (parentKind === 'array') return `${parentPath}[${key}]`;
+  return parentPath === '' ? String(key) : `${parentPath}.${String(key)}`;
+}
+
+function isNodeOpen(
+  path: string,
+  depth: number,
+  userOverrides: Map<string, boolean>,
+  expandPaths: Set<string> | undefined,
+): boolean {
+  if (expandPaths?.has(path)) return true;
+  const override = userOverrides.get(path);
+  if (override !== undefined) return override;
+  return depth < 2; // default policy
+}
+
+function computeLineNumbers(
+  value: unknown,
+  userOverrides: Map<string, boolean>,
+  expandPaths: Set<string> | undefined,
+): Map<string, LineInfo> {
+  const map = new Map<string, LineInfo>();
+  const counter = { n: 0 };
+
+  const walk = (v: unknown, path: string, depth: number): void => {
+    const kind = typeLabel(v);
+    const opening = ++counter.n;
+
+    if (kind === 'array' || kind === 'object') {
+      const open = isNodeOpen(path, depth, userOverrides, expandPaths);
+      if (open) {
+        const entries =
+          kind === 'array'
+            ? (v as unknown[]).map((x, i) => [i, x] as const)
+            : Object.entries(v as Record<string, unknown>);
+        map.set(path, { opening });
+        for (const [k, cv] of entries) {
+          walk(cv, childPath(path, k, kind as 'array' | 'object'), depth + 1);
+        }
+        const closing = ++counter.n;
+        map.set(path, { opening, closing });
+      } else {
+        // Closed container: just one row with the brace inline.
+        map.set(path, { opening });
+      }
+    } else {
+      // Primitive: one row.
+      map.set(path, { opening });
+    }
+  };
+
+  walk(value, '', 0);
+  return map;
 }
 
 export function JsonView({
@@ -35,16 +109,10 @@ export function JsonView({
   query,
   caseSensitive,
 }: Props) {
-  const lineCounter = useRef<LineCounter>({ value: 0 });
-  // Reset on every render so numbers stay in sync with the tree.
-  lineCounter.current.value = 0;
-
   // User overrides for per-node open/closed state. A path is absent until the
   // user explicitly toggles it — then we store the new open/closed boolean.
-  // Lifting this to the root means any toggle re-renders the whole tree,
-  // which is what keeps the mutable line-number counter correct. If we kept
-  // `open` as local state inside each Node, only the toggled subtree would
-  // re-render — sibling rows would keep their stale line numbers.
+  // Lifted to the root so any toggle re-renders the whole tree, which is
+  // what keeps the line-number map in sync.
   const [userOverrides, setUserOverrides] = useState<Map<string, boolean>>(() => new Map());
 
   const togglePath = useCallback((path: string, nextOpen: boolean) => {
@@ -55,6 +123,11 @@ export function JsonView({
     });
   }, []);
 
+  const lineNumbers = useMemo(
+    () => computeLineNumbers(value, userOverrides, expandPaths),
+    [value, userOverrides, expandPaths],
+  );
+
   return (
     <div className="font-mono text-[13px] leading-6 scrollbar-thin overflow-auto">
       <Node
@@ -62,7 +135,7 @@ export function JsonView({
         value={value}
         path=""
         depth={0}
-        lineCounter={lineCounter.current}
+        lineNumbers={lineNumbers}
         userOverrides={userOverrides}
         onTogglePath={togglePath}
         highlightPaths={highlightPaths}
@@ -152,7 +225,7 @@ interface NodeProps {
   value: unknown;
   path: string;
   depth: number;
-  lineCounter: LineCounter;
+  lineNumbers: Map<string, LineInfo>;
   userOverrides: Map<string, boolean>;
   onTogglePath: (path: string, nextOpen: boolean) => void;
   highlightPaths?: Map<string, 'added' | 'removed' | 'changed'>;
@@ -169,7 +242,7 @@ function Node({
   value,
   path,
   depth,
-  lineCounter,
+  lineNumbers,
   userOverrides,
   onTogglePath,
   highlightPaths,
@@ -184,17 +257,15 @@ function Node({
   const highlight = highlightPaths?.get(path);
   const searchMatch = searchMatches?.get(path);
   const isActiveMatch = activeMatchPath === path;
-  const shouldForceExpand = expandPaths?.has(path);
 
-  // Derive open-state with priority: search-force > user override > default.
-  // Default policy: depth < 2 is expanded.
-  const userOverride = userOverrides.get(path);
-  const defaultOpen = depth < 2;
-  const open = shouldForceExpand
-    ? true
-    : userOverride !== undefined
-      ? userOverride
-      : defaultOpen;
+  // Open-state resolution must match computeLineNumbers exactly, otherwise
+  // the pre-pass and the render disagree and children get mis-numbered.
+  const open = isNodeOpen(path, depth, userOverrides, expandPaths);
+
+  // Pre-computed line numbers for this path.
+  const lineInfo = lineNumbers.get(path);
+  const openingLineNo = lineInfo?.opening ?? 0;
+  const closingLineNo = lineInfo?.closing ?? openingLineNo;
 
   const diffClass = useMemo(() => {
     if (!highlight) return '';
@@ -215,7 +286,7 @@ function Node({
   const rowHlClass = [searchClass, diffClass].filter(Boolean).join(' ');
 
   const childProps = {
-    lineCounter,
+    lineNumbers,
     userOverrides,
     onTogglePath,
     highlightPaths,
@@ -259,8 +330,6 @@ function Node({
     const open_br = kind === 'array' ? '[' : '{';
     const close_br = kind === 'array' ? ']' : '}';
 
-    const openingLineNo = ++lineCounter.value;
-
     return (
       <>
         <Row lineNo={openingLineNo} hlClass={rowHlClass}>
@@ -294,19 +363,13 @@ function Node({
                 key={String(k)}
                 name={k as string | number}
                 value={v}
-                path={
-                  kind === 'array'
-                    ? `${path}[${k}]`
-                    : path === ''
-                      ? String(k)
-                      : `${path}.${String(k)}`
-                }
+                path={childPath(path, k, kind as 'array' | 'object')}
                 depth={depth + 1}
                 trailingComma={idx < entries.length - 1}
                 {...childProps}
               />
             ))}
-            <Row lineNo={++lineCounter.value} hlClass={diffClass}>
+            <Row lineNo={closingLineNo} hlClass={diffClass}>
               <Indent depth={depth} />
               <span className="text-ink-secondary ml-5">
                 {close_br}
@@ -320,9 +383,8 @@ function Node({
   }
 
   // Primitive row.
-  const primitiveLineNo = ++lineCounter.value;
   return (
-    <Row lineNo={primitiveLineNo} hlClass={rowHlClass}>
+    <Row lineNo={openingLineNo} hlClass={rowHlClass}>
       <Indent depth={depth} />
       <span className="mr-1 w-4 flex-shrink-0" aria-hidden />
       {renderKey()}
@@ -454,11 +516,12 @@ function HighlightText({
   const t = norm(text);
 
   // On active rows, the row already has a saturated background — use a solid
-  // gold fill with dark text for strong letter-level contrast. On non-active
-  // rows, the row background is barely tinted, so an underline reads better.
+  // highlight fill (per-theme search-active-border token) with base-colored
+  // text for strong letter-level contrast. On non-active rows, the row
+  // background is barely tinted, so an underline reads better.
   const markClass = activeRow
-    ? 'bg-accent-string text-bg-base rounded-[2px] px-[1px]'
-    : 'bg-transparent text-inherit underline decoration-2 decoration-accent-string';
+    ? 'bg-search-activeBorder text-bg-base rounded-[2px] px-[1px]'
+    : 'bg-transparent text-inherit underline decoration-2 decoration-search-activeBorder';
 
   const parts: ReactNode[] = [];
   let last = 0;
