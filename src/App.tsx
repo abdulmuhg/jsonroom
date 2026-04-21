@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { TabBar } from './components/TabBar';
 import { Pane } from './components/Pane';
 import { Intro } from './components/Intro';
@@ -7,6 +7,7 @@ import { useTabs } from './hooks/useTabs';
 import { useTheme } from './hooks/useTheme';
 import { parseJson } from './lib/parseJson';
 import { diffJson } from './lib/diff';
+import { unifyTrees } from './lib/unify';
 
 const INTRO_SEEN_KEY = 'jsonroom.introSeen.v1';
 
@@ -56,13 +57,46 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [activeId, activeTab, addTab, closeTab, updateTab, showIntro]);
 
-  const diffEntries = useMemo(() => {
-    if (activeTab.mode !== 'compare') return [];
+  // Parse both sides once per tab change so diff + unified alignment can
+  // share the result without re-parsing.
+  const compareParsed = useMemo(() => {
+    if (activeTab.mode !== 'compare') return null;
     const l = parseJson(activeTab.leftRaw);
     const r = parseJson(activeTab.rightRaw);
-    if (!l.ok || !r.ok) return [];
-    return diffJson(l.value, r.value);
+    if (!l.ok || !r.ok) return null;
+    return { left: l.value, right: r.value };
   }, [activeTab]);
+
+  const diffEntries = useMemo(() => {
+    if (!compareParsed) return [];
+    return diffJson(compareParsed.left, compareParsed.right);
+  }, [compareParsed]);
+
+  // Aligned trees with MISSING placeholders at any path that exists on only
+  // one side. Letting both panes render the same structure is what keeps
+  // their rows in lock-step when the JSON shapes differ.
+  const unified = useMemo(() => {
+    if (!compareParsed) return null;
+    return unifyTrees(compareParsed.left, compareParsed.right);
+  }, [compareParsed]);
+
+  // Shared expand/collapse state for compare mode — both panes use the same
+  // map so a toggle on one side re-renders both to the same row layout.
+  // Reset when the tab identity changes (switching tabs or leaving compare).
+  const [compareOverrides, setCompareOverrides] = useState<Map<string, boolean>>(
+    () => new Map(),
+  );
+  useEffect(() => {
+    setCompareOverrides(new Map());
+  }, [activeId, activeTab.mode]);
+
+  const toggleComparePath = useCallback((path: string, nextOpen: boolean) => {
+    setCompareOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(path, nextOpen);
+      return next;
+    });
+  }, []);
 
   return (
     <div className="flex h-screen flex-col">
@@ -125,6 +159,9 @@ export default function App() {
             })
           }
           diffCount={diffEntries.length}
+          displayValue={unified ? unified.left : undefined}
+          userOverrides={unified ? compareOverrides : undefined}
+          onTogglePath={unified ? toggleComparePath : undefined}
         />
         {activeTab.mode === 'compare' && (
           <>
@@ -135,6 +172,9 @@ export default function App() {
               onChange={(raw) => updateTab(activeId, { rightRaw: raw })}
               diffEntries={diffEntries}
               diffSide="right"
+              displayValue={unified ? unified.right : undefined}
+              userOverrides={unified ? compareOverrides : undefined}
+              onTogglePath={unified ? toggleComparePath : undefined}
             />
           </>
         )}

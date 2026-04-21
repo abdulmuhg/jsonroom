@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ReactNode, MutableRefObject } from 'react';
 import type { SearchMatch } from '../hooks/useSearch';
+import { isMissing } from '../lib/unify';
 
 interface Props {
   value: unknown;
@@ -10,6 +11,13 @@ interface Props {
   expandPaths?: Set<string>;
   query?: string;
   caseSensitive?: boolean;
+  /**
+   * When provided, the view becomes "controlled" for per-node expand/collapse
+   * state. The parent owns the map and gets notified of toggles. Used by the
+   * compare-mode Panes so both sides mirror each other's expand state.
+   */
+  userOverrides?: Map<string, boolean>;
+  onTogglePath?: (path: string, nextOpen: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -34,6 +42,7 @@ interface LineInfo {
 }
 
 function typeLabel(v: unknown): string {
+  if (isMissing(v)) return 'missing';
   if (v === null) return 'null';
   if (Array.isArray(v)) return 'array';
   return typeof v;
@@ -108,20 +117,35 @@ export function JsonView({
   expandPaths,
   query,
   caseSensitive,
+  userOverrides: userOverridesProp,
+  onTogglePath: onTogglePathProp,
 }: Props) {
   // User overrides for per-node open/closed state. A path is absent until the
   // user explicitly toggles it — then we store the new open/closed boolean.
   // Lifted to the root so any toggle re-renders the whole tree, which is
   // what keeps the line-number map in sync.
-  const [userOverrides, setUserOverrides] = useState<Map<string, boolean>>(() => new Map());
+  //
+  // When `userOverridesProp` / `onTogglePathProp` are provided, the view is
+  // "controlled" and delegates to the parent — used by compare-mode Panes so
+  // both sides expand/collapse together.
+  const [localOverrides, setLocalOverrides] = useState<Map<string, boolean>>(() => new Map());
 
-  const togglePath = useCallback((path: string, nextOpen: boolean) => {
-    setUserOverrides((prev) => {
-      const next = new Map(prev);
-      next.set(path, nextOpen);
-      return next;
-    });
-  }, []);
+  const userOverrides = userOverridesProp ?? localOverrides;
+
+  const togglePath = useCallback(
+    (path: string, nextOpen: boolean) => {
+      if (onTogglePathProp) {
+        onTogglePathProp(path, nextOpen);
+        return;
+      }
+      setLocalOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(path, nextOpen);
+        return next;
+      });
+    },
+    [onTogglePathProp],
+  );
 
   const lineNumbers = useMemo(
     () => computeLineNumbers(value, userOverrides, expandPaths),
@@ -166,9 +190,17 @@ function Row({
   return (
     <div className="flex group">
       <div className="w-10 flex-shrink-0 select-none bg-bg-gutter text-right pr-2 text-ink-subtle text-[11px] leading-6">
-        {lineNo}
+        {lineNo > 0 ? lineNo : ''}
       </div>
-      <div className={['flex-1 min-w-0 pl-3 flex items-center', hlClass ?? ''].join(' ')}>
+      {/* `border-l-2 border-transparent` reserves 2px of space on every row so
+       *  diff/search rows (which swap to a colored border) don't cause a 2px
+       *  horizontal jitter. Highlight classes only set color now, not width. */}
+      <div
+        className={[
+          'flex-1 min-w-0 pl-3 flex items-center border-l-2 border-transparent',
+          hlClass ?? '',
+        ].join(' ')}
+      >
         {children}
       </div>
     </div>
@@ -269,15 +301,15 @@ function Node({
 
   const diffClass = useMemo(() => {
     if (!highlight) return '';
-    if (highlight === 'added') return 'bg-diff-addBg border-l-2 border-diff-add';
-    if (highlight === 'removed') return 'bg-diff-removeBg border-l-2 border-diff-remove';
-    return 'bg-diff-changeBg border-l-2 border-diff-change';
+    if (highlight === 'added') return 'bg-diff-addBg border-diff-add';
+    if (highlight === 'removed') return 'bg-diff-removeBg border-diff-remove';
+    return 'bg-diff-changeBg border-diff-change';
   }, [highlight]);
 
   const searchClass = isActiveMatch
-    ? 'bg-search-active border-l-2 border-search-activeBorder'
+    ? 'bg-search-active border-search-activeBorder'
     : searchMatch
-      ? 'bg-search-match border-l-2 border-search-matchBorder'
+      ? 'bg-search-match border-search-matchBorder'
       : '';
 
   // Prefer the diff highlight over the search tint visually. If both apply,
@@ -321,6 +353,22 @@ function Node({
       </>
     );
   };
+
+  // MISSING sentinel — this path exists on the other side of a diff but not
+  // here. We render a dim placeholder row so the two panes keep identical row
+  // structure and scroll in lock-step. No chevron, no copy button, just the
+  // indent guides + key label + a subtle em-dash.
+  if (kind === 'missing') {
+    return (
+      <Row lineNo={openingLineNo} hlClass={rowHlClass}>
+        <Indent depth={depth} />
+        <span className="mr-1 w-4 flex-shrink-0" aria-hidden />
+        {renderKey()}
+        <span className="text-ink-subtle/60 italic select-none">—</span>
+        {trailingComma && <span className="text-ink-subtle/60">,</span>}
+      </Row>
+    );
+  }
 
   if (kind === 'array' || kind === 'object') {
     const entries =

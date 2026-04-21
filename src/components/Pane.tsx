@@ -18,6 +18,16 @@ interface Props {
   isCompareMode?: boolean;
   onToggleCompare?: () => void;
   diffCount?: number;
+  /**
+   * When set, the pane renders this aligned value instead of its parsed `raw`.
+   * Used in compare mode so both panes share identical tree structure (with
+   * `MISSING` placeholders) and therefore line up row-for-row. Counts and the
+   * pane header still reflect the original parsed value.
+   */
+  displayValue?: unknown;
+  /** Controlled per-node open/closed map. Shared across panes in compare mode. */
+  userOverrides?: Map<string, boolean>;
+  onTogglePath?: (path: string, nextOpen: boolean) => void;
 }
 
 export function Pane({
@@ -30,9 +40,18 @@ export function Pane({
   isCompareMode,
   onToggleCompare,
   diffCount,
+  displayValue,
+  userOverrides,
+  onTogglePath,
 }: Props) {
   const parsed = useMemo(() => parseJson(raw), [raw]);
 
+  // The value the JSON tree renders. In compare mode this is the aligned
+  // value (with MISSING placeholders); otherwise it's the parsed value itself.
+  const renderValue = displayValue !== undefined ? displayValue : parsed.ok ? parsed.value : null;
+
+  // Search stays over the user's own JSON — not the aligned one. Missing
+  // placeholders shouldn't produce search hits on this side.
   const search = useSearch(parsed.ok ? parsed.value : null);
 
   // "Copy all" state
@@ -292,13 +311,15 @@ export function Pane({
           }}
         >
           <JsonView
-            value={parsed.value}
+            value={renderValue}
             highlightPaths={highlightPaths}
             searchMatches={searchMatchMap}
             activeMatchPath={search.activeMatch?.path}
             expandPaths={search.expandPaths}
             query={search.query}
             caseSensitive={search.caseSensitive}
+            userOverrides={userOverrides}
+            onTogglePath={onTogglePath}
           />
         </div>
       ) : (
