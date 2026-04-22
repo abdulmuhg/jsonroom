@@ -16,8 +16,9 @@ describe('unifyTrees', () => {
 
   it('preserves left key order, appends right-only keys in right order', () => {
     const { left, right } = unifyTrees({ a: 1, b: 2 }, { c: 3, b: 4, d: 5 });
-    expect(Object.keys(left)).toEqual(['a', 'b', 'c', 'd']);
-    expect(Object.keys(right)).toEqual(['a', 'b', 'c', 'd']);
+    // `left`/`right` are typed `unknown` on UnifiedPair — cast for Object.keys.
+    expect(Object.keys(left as Record<string, unknown>)).toEqual(['a', 'b', 'c', 'd']);
+    expect(Object.keys(right as Record<string, unknown>)).toEqual(['a', 'b', 'c', 'd']);
   });
 
   it('aligns arrays by index up to the longer length', () => {
