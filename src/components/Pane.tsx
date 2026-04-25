@@ -1,6 +1,12 @@
 import { useCallback, useRef, useMemo, useState } from 'react';
 import { approximateSize, countKeys, parseJson } from '../lib/parseJson';
 import { repairJson } from '../lib/repairJson';
+import {
+  setValueAtPath,
+  deleteAtPath,
+  renameKeyAtPath,
+  addChildAtPath,
+} from '../lib/editPath';
 import { JsonView } from './JsonView';
 import { SearchBar } from './SearchBar';
 import { useSearch } from '../hooks/useSearch';
@@ -45,6 +51,53 @@ export function Pane({
   onTogglePath,
 }: Props) {
   const parsed = useMemo(() => parseJson(raw), [raw]);
+
+  // Inline tree edits. Each callback applies the structural edit to the
+  // parsed value, then re-serializes back to `raw` via `onChange`. Edits are
+  // disabled when the parent provides a `displayValue` (compare mode), since
+  // the aligned tree's MISSING placeholders aren't real keys yet.
+  const editsEnabled = parsed.ok && displayValue === undefined;
+
+  const commitEdit = useCallback(
+    (nextValue: unknown) => {
+      onChange(JSON.stringify(nextValue, null, 2));
+    },
+    [onChange],
+  );
+
+  const handleEditValue = useCallback(
+    (path: string, newValue: unknown) => {
+      if (!parsed.ok) return;
+      commitEdit(setValueAtPath(parsed.value, path, newValue));
+    },
+    [parsed, commitEdit],
+  );
+
+  const handleRenameKey = useCallback(
+    (path: string, newKey: string) => {
+      if (!parsed.ok) return;
+      commitEdit(renameKeyAtPath(parsed.value, path, newKey));
+    },
+    [parsed, commitEdit],
+  );
+
+  const handleDelete = useCallback(
+    (path: string) => {
+      if (!parsed.ok) return;
+      commitEdit(deleteAtPath(parsed.value, path));
+    },
+    [parsed, commitEdit],
+  );
+
+  const handleAddChild = useCallback(
+    (parentPath: string) => {
+      if (!parsed.ok) return;
+      // Default new value: empty string. The user can immediately click to
+      // edit it (or rename the key, for objects).
+      commitEdit(addChildAtPath(parsed.value, parentPath, ''));
+    },
+    [parsed, commitEdit],
+  );
 
   // The value the JSON tree renders. In compare mode this is the aligned
   // value (with MISSING placeholders); otherwise it's the parsed value itself.
@@ -320,6 +373,10 @@ export function Pane({
             caseSensitive={search.caseSensitive}
             userOverrides={userOverrides}
             onTogglePath={onTogglePath}
+            onEditValue={editsEnabled ? handleEditValue : undefined}
+            onRenameKey={editsEnabled ? handleRenameKey : undefined}
+            onAddChild={editsEnabled ? handleAddChild : undefined}
+            onDelete={editsEnabled ? handleDelete : undefined}
           />
         </div>
       ) : (

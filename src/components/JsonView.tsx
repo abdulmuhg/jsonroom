@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, MutableRefObject } from 'react';
 import type { SearchMatch } from '../hooks/useSearch';
 import { isMissing } from '../lib/unify';
+import { coerceInputToJson } from '../lib/editPath';
 
 interface Props {
   value: unknown;
@@ -18,6 +19,16 @@ interface Props {
    */
   userOverrides?: Map<string, boolean>;
   onTogglePath?: (path: string, nextOpen: boolean) => void;
+  /**
+   * Edit callbacks. When provided, primitive values become click-to-edit
+   * inputs, object keys become click-to-rename inputs, and array/object
+   * rows show hover-only add/delete buttons. Pass undefined to keep the
+   * tree read-only (e.g. in compare mode).
+   */
+  onEditValue?: (path: string, newValue: unknown) => void;
+  onRenameKey?: (path: string, newKey: string) => void;
+  onAddChild?: (parentPath: string) => void;
+  onDelete?: (path: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +130,10 @@ export function JsonView({
   caseSensitive,
   userOverrides: userOverridesProp,
   onTogglePath: onTogglePathProp,
+  onEditValue,
+  onRenameKey,
+  onAddChild,
+  onDelete,
 }: Props) {
   // User overrides for per-node open/closed state. A path is absent until the
   // user explicitly toggles it — then we store the new open/closed boolean.
@@ -168,6 +183,10 @@ export function JsonView({
         expandPaths={expandPaths}
         query={query}
         caseSensitive={caseSensitive}
+        onEditValue={onEditValue}
+        onRenameKey={onRenameKey}
+        onAddChild={onAddChild}
+        onDelete={onDelete}
       />
     </div>
   );
@@ -267,6 +286,14 @@ interface NodeProps {
   query?: string;
   caseSensitive?: boolean;
   trailingComma?: boolean;
+  /** True when this node sits inside an array — affects key rename. */
+  parentKind?: 'array' | 'object' | null;
+  /** Sibling keys at this level — used to validate rename collisions. */
+  siblingKeys?: Set<string>;
+  onEditValue?: (path: string, newValue: unknown) => void;
+  onRenameKey?: (path: string, newKey: string) => void;
+  onAddChild?: (parentPath: string) => void;
+  onDelete?: (path: string) => void;
 }
 
 function Node({
@@ -284,6 +311,12 @@ function Node({
   query,
   caseSensitive,
   trailingComma,
+  parentKind,
+  siblingKeys,
+  onEditValue,
+  onRenameKey,
+  onAddChild,
+  onDelete,
 }: NodeProps) {
   const kind = typeLabel(value);
   const highlight = highlightPaths?.get(path);
@@ -327,6 +360,10 @@ function Node({
     expandPaths,
     query,
     caseSensitive,
+    onEditValue,
+    onRenameKey,
+    onAddChild,
+    onDelete,
   };
 
   // Render the key label (unquoted for string keys, [n] for array indices).
@@ -335,20 +372,36 @@ function Node({
     if (name === null) return null;
     const keyText = typeof name === 'number' ? `[${name}]` : String(name);
     const keyColorClass = isActiveMatch ? 'text-ink-primary font-semibold' : 'text-accent-key';
+    const canRename =
+      onRenameKey && parentKind === 'object' && typeof name === 'string';
+
     return (
       <>
-        <span className={keyColorClass}>
-          {query && searchMatch?.matchesKey ? (
-            <HighlightText
-              text={keyText}
-              query={query}
-              caseSensitive={caseSensitive ?? false}
-              activeRow={isActiveMatch}
-            />
-          ) : (
-            keyText
-          )}
-        </span>
+        {canRename ? (
+          <EditableKey
+            keyText={keyText}
+            colorClass={keyColorClass}
+            siblingKeys={siblingKeys}
+            onCommit={(newKey) => onRenameKey!(path, newKey)}
+            query={query}
+            caseSensitive={caseSensitive}
+            matchesKey={searchMatch?.matchesKey}
+            activeRow={isActiveMatch}
+          />
+        ) : (
+          <span className={keyColorClass}>
+            {query && searchMatch?.matchesKey ? (
+              <HighlightText
+                text={keyText}
+                query={query}
+                caseSensitive={caseSensitive ?? false}
+                activeRow={isActiveMatch}
+              />
+            ) : (
+              keyText
+            )}
+          </span>
+        )}
         <span className="text-ink-muted mx-1">:</span>
       </>
     );
@@ -377,6 +430,11 @@ function Node({
         : Object.entries(value as Record<string, unknown>);
     const open_br = kind === 'array' ? '[' : '{';
     const close_br = kind === 'array' ? ']' : '}';
+    const childKindForChildren = kind as 'array' | 'object';
+    const childSiblingKeys =
+      kind === 'object'
+        ? new Set(Object.keys(value as Record<string, unknown>))
+        : undefined;
 
     return (
       <>
@@ -403,6 +461,11 @@ function Node({
             </>
           )}
           <CopyButton value={value} block />
+          <RowEditActions
+            onAddChild={onAddChild ? () => onAddChild(path) : undefined}
+            onDelete={onDelete && path !== '' ? () => onDelete(path) : undefined}
+            addLabel={kind === 'array' ? 'Add item' : 'Add key'}
+          />
         </Row>
         {open && (
           <>
@@ -411,9 +474,11 @@ function Node({
                 key={String(k)}
                 name={k as string | number}
                 value={v}
-                path={childPath(path, k, kind as 'array' | 'object')}
+                path={childPath(path, k, childKindForChildren)}
                 depth={depth + 1}
                 trailingComma={idx < entries.length - 1}
+                parentKind={childKindForChildren}
+                siblingKeys={childSiblingKeys}
                 {...childProps}
               />
             ))}
@@ -436,15 +501,29 @@ function Node({
       <Indent depth={depth} />
       <span className="mr-1 w-4 flex-shrink-0" aria-hidden />
       {renderKey()}
-      <PrimitiveValue
-        value={value}
-        query={query}
-        caseSensitive={caseSensitive}
-        matchesValue={searchMatch?.matchesValue}
-        activeRow={isActiveMatch}
-      />
-      <CopyButton value={value} />
+      {onEditValue ? (
+        <EditablePrimitive
+          value={value}
+          onCommit={(v) => onEditValue(path, v)}
+          query={query}
+          caseSensitive={caseSensitive}
+          matchesValue={searchMatch?.matchesValue}
+          activeRow={isActiveMatch}
+        />
+      ) : (
+        <PrimitiveValue
+          value={value}
+          query={query}
+          caseSensitive={caseSensitive}
+          matchesValue={searchMatch?.matchesValue}
+          activeRow={isActiveMatch}
+        />
+      )}
       {trailingComma && <span className="text-ink-muted">,</span>}
+      <CopyButton value={value} />
+      <RowEditActions
+        onDelete={onDelete && path !== '' ? () => onDelete(path) : undefined}
+      />
     </Row>
   );
 }
@@ -534,12 +613,10 @@ function CopyButton({ value, block }: { value: unknown; block?: boolean }) {
       className="ml-2 opacity-0 group-hover:opacity-100 text-ink-muted hover:text-ink-primary transition-opacity flex-shrink-0"
     >
       {copied ? (
-        // Check icon
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" width={12} height={12}>
           <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
         </svg>
       ) : (
-        // Clipboard icon
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" width={12} height={12}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
         </svg>
@@ -562,11 +639,6 @@ function HighlightText({
   const norm = (s: string) => (caseSensitive ? s : s.toLowerCase());
   const q = caseSensitive ? query : query.toLowerCase();
   const t = norm(text);
-
-  // On active rows, the row already has a saturated background — use a solid
-  // highlight fill (per-theme search-active-border token) with base-colored
-  // text for strong letter-level contrast. On non-active rows, the row
-  // background is barely tinted, so an underline reads better.
   const markClass = activeRow
     ? 'bg-search-activeBorder text-bg-base rounded-[2px] px-[1px]'
     : 'bg-transparent text-inherit underline decoration-2 decoration-search-activeBorder';
@@ -574,7 +646,6 @@ function HighlightText({
   const parts: ReactNode[] = [];
   let last = 0;
   let idx = t.indexOf(q, last);
-
   while (idx !== -1) {
     if (idx > last) parts.push(text.slice(last, idx));
     parts.push(
@@ -585,7 +656,246 @@ function HighlightText({
     last = idx + query.length;
     idx = t.indexOf(q, last);
   }
-
   if (last < text.length) parts.push(text.slice(last));
   return <>{parts}</>;
+}
+
+// ---------------------------------------------------------------------------
+// Edit-mode components.
+// ---------------------------------------------------------------------------
+
+function EditablePrimitive({
+  value,
+  onCommit,
+  query,
+  caseSensitive,
+  matchesValue,
+  activeRow,
+}: {
+  value: unknown;
+  onCommit: (next: unknown) => void;
+  query?: string;
+  caseSensitive?: boolean;
+  matchesValue?: boolean;
+  activeRow?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const initialText =
+    typeof value === 'string' ? value : value === null ? 'null' : String(value);
+  const [draft, setDraft] = useState(initialText);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) setDraft(initialText);
+  }, [initialText, editing]);
+
+  const commit = () => {
+    setEditing(false);
+    let next: unknown;
+    if (typeof value === 'string') {
+      next = draft;
+    } else {
+      next = coerceInputToJson(draft);
+    }
+    if (next !== value) onCommit(next);
+  };
+
+  const cancel = () => {
+    setDraft(initialText);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commit();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancel();
+          }
+        }}
+        className="bg-bg-elev/60 px-1 rounded text-ink-primary font-mono text-[13px] leading-6 outline-none ring-1 ring-accent-key/60 focus:ring-accent-key min-w-[4ch]"
+        size={Math.max(draft.length + 1, 4)}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="text-left rounded hover:bg-bg-hover/40 px-0.5 -mx-0.5"
+      title="Click to edit"
+    >
+      <PrimitiveValue
+        value={value}
+        query={query}
+        caseSensitive={caseSensitive}
+        matchesValue={matchesValue}
+        activeRow={activeRow}
+      />
+    </button>
+  );
+}
+
+function EditableKey({
+  keyText,
+  colorClass,
+  siblingKeys,
+  onCommit,
+  query,
+  caseSensitive,
+  matchesKey,
+  activeRow,
+}: {
+  keyText: string;
+  colorClass: string;
+  siblingKeys?: Set<string>;
+  onCommit: (newKey: string) => void;
+  query?: string;
+  caseSensitive?: boolean;
+  matchesKey?: boolean;
+  activeRow?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(keyText);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing) setDraft(keyText);
+  }, [keyText, editing]);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed === '' || trimmed === keyText) {
+      setDraft(keyText);
+      setEditing(false);
+      return;
+    }
+    if (siblingKeys && siblingKeys.has(trimmed) && trimmed !== keyText) {
+      inputRef.current?.focus();
+      return;
+    }
+    setEditing(false);
+    onCommit(trimmed);
+  };
+
+  const cancel = () => {
+    setDraft(keyText);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commit();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancel();
+          }
+        }}
+        className={[
+          'bg-bg-elev/60 px-1 rounded font-mono text-[13px] leading-6 outline-none ring-1 ring-accent-key/60 focus:ring-accent-key min-w-[4ch]',
+          colorClass,
+        ].join(' ')}
+        size={Math.max(draft.length + 1, 4)}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className={[colorClass, 'text-left rounded hover:bg-bg-hover/40 px-0.5 -mx-0.5'].join(' ')}
+      title="Click to rename"
+    >
+      {query && matchesKey ? (
+        <HighlightText
+          text={keyText}
+          query={query}
+          caseSensitive={caseSensitive ?? false}
+          activeRow={activeRow}
+        />
+      ) : (
+        keyText
+      )}
+    </button>
+  );
+}
+
+function RowEditActions({
+  onAddChild,
+  onDelete,
+  addLabel,
+}: {
+  onAddChild?: () => void;
+  onDelete?: () => void;
+  addLabel?: string;
+}) {
+  if (!onAddChild && !onDelete) return null;
+  return (
+    <span className="ml-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+      {onAddChild && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddChild();
+          }}
+          aria-label={addLabel ?? 'Add child'}
+          title={addLabel ?? 'Add child'}
+          className="flex h-5 w-5 items-center justify-center rounded text-ink-muted hover:bg-bg-hover hover:text-accent-key"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width={12} height={12}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </button>
+      )}
+      {onDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          aria-label="Delete"
+          title="Delete"
+          className="flex h-5 w-5 items-center justify-center rounded text-ink-muted hover:bg-diff-removeBg hover:text-diff-remove"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" width={12} height={12}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </span>
+  );
 }
