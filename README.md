@@ -1,8 +1,5 @@
 # JSONRoom
 
-> *"Is this the Jason room?"*
-> *"Close — but this is the **JSON** Room."*
-
 A quiet, ad-free room for your JSON. A viewer, formatter, fixer, and side-by-side diff tool built for debugging API responses with your team — especially when you're sharing your screen.
 
 Live at **[json.abdulmughnialfikri.com](https://jsonroom.abdulmughnialfikri.com)**. Contribute at **[github.com/abdulmuhg/jsonroom](https://github.com/abdulmuhg/jsonroom)**.
