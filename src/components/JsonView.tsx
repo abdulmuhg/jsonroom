@@ -201,14 +201,26 @@ function Row({
   lineNo,
   hlClass,
   children,
+  rightActions,
 }: {
   lineNo: number;
   hlClass?: string;
   children: ReactNode;
+  /**
+   * Per-row action buttons (copy, add, delete) that should "stick" to the
+   * right edge of the visible viewport when the row is wider than the
+   * scrolling container. Without this, long values push the buttons
+   * off-screen and force the user to scroll horizontally to reach them.
+   */
+  rightActions?: ReactNode;
 }) {
   return (
     <div className="flex group">
-      <div className="w-10 flex-shrink-0 select-none bg-bg-gutter text-right pr-2 text-ink-subtle text-[11px] leading-6">
+      {/* `sticky left-0` pins the gutter to the visible left edge so line
+       *  numbers stay readable even when the row scrolls horizontally past
+       *  the viewport. `z-20` keeps it above the row content (which itself
+       *  has the right-edge sticky actions at z-10). */}
+      <div className="w-10 flex-shrink-0 select-none bg-bg-gutter text-right pr-2 text-ink-subtle text-[11px] leading-6 sticky left-0 z-20">
         {lineNo > 0 ? lineNo : ''}
       </div>
       {/* `border-l-2 border-transparent` reserves 2px of space on every row so
@@ -221,6 +233,19 @@ function Row({
         ].join(' ')}
       >
         {children}
+        {rightActions && (
+          <span
+            // `sticky right-0` keeps the action group pinned to the right
+            // edge of the scroll viewport even when the row's content is
+            // wider than the container. `ml-auto` pushes it to the right
+            // when the row content is narrower (no scroll). The background
+            // gradient hides any value text that would otherwise sit
+            // underneath the pinned buttons.
+            className="ml-auto sticky right-0 pl-4 flex items-center bg-gradient-to-l from-bg-base via-bg-base/95 to-transparent z-10"
+          >
+            {rightActions}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -438,7 +463,20 @@ function Node({
 
     return (
       <>
-        <Row lineNo={openingLineNo} hlClass={rowHlClass}>
+        <Row
+          lineNo={openingLineNo}
+          hlClass={rowHlClass}
+          rightActions={
+            <>
+              <CopyButton value={value} block />
+              <RowEditActions
+                onAddChild={onAddChild ? () => onAddChild(path) : undefined}
+                onDelete={onDelete && path !== '' ? () => onDelete(path) : undefined}
+                addLabel={kind === 'array' ? 'Add item' : 'Add key'}
+              />
+            </>
+          }
+        >
           <Indent depth={depth} />
           <button
             onClick={() => onTogglePath(path, !open)}
@@ -460,12 +498,6 @@ function Node({
               </span>
             </>
           )}
-          <CopyButton value={value} block />
-          <RowEditActions
-            onAddChild={onAddChild ? () => onAddChild(path) : undefined}
-            onDelete={onDelete && path !== '' ? () => onDelete(path) : undefined}
-            addLabel={kind === 'array' ? 'Add item' : 'Add key'}
-          />
         </Row>
         {open && (
           <>
@@ -497,7 +529,18 @@ function Node({
 
   // Primitive row.
   return (
-    <Row lineNo={openingLineNo} hlClass={rowHlClass}>
+    <Row
+      lineNo={openingLineNo}
+      hlClass={rowHlClass}
+      rightActions={
+        <>
+          <CopyButton value={value} />
+          <RowEditActions
+            onDelete={onDelete && path !== '' ? () => onDelete(path) : undefined}
+          />
+        </>
+      }
+    >
       <Indent depth={depth} />
       <span className="mr-1 w-4 flex-shrink-0" aria-hidden />
       {renderKey()}
@@ -520,10 +563,6 @@ function Node({
         />
       )}
       {trailingComma && <span className="text-ink-muted">,</span>}
-      <CopyButton value={value} />
-      <RowEditActions
-        onDelete={onDelete && path !== '' ? () => onDelete(path) : undefined}
-      />
     </Row>
   );
 }
@@ -687,7 +726,11 @@ function EditablePrimitive({
 
   useEffect(() => {
     if (editing) {
-      inputRef.current?.focus();
+      // `preventScroll: true` stops the browser from auto-scrolling the row
+      // to bring the input into view. Without this, clicking a long string
+      // value yanks the row to the far right (since the input expands to
+      // fit) and pulls the line-number gutter off-screen.
+      inputRef.current?.focus({ preventScroll: true });
       inputRef.current?.select();
     }
   }, [editing]);
@@ -728,8 +771,11 @@ function EditablePrimitive({
             cancel();
           }
         }}
-        className="bg-bg-elev/60 px-1 rounded text-ink-primary font-mono text-[13px] leading-6 outline-none ring-1 ring-accent-key/60 focus:ring-accent-key min-w-[4ch]"
-        size={Math.max(draft.length + 1, 4)}
+        // Width is capped: enough to comfortably show typical edits without
+        // forcing the row wider than the viewport. Long strings get an
+        // internal horizontal scrollbar inside the input. Avoid the `size`
+        // attribute — it scales the rendered element with content length.
+        className="bg-bg-elev/60 px-1 rounded text-ink-primary font-mono text-[13px] leading-6 outline-none ring-1 ring-accent-key/60 focus:ring-accent-key w-[40ch] max-w-full"
       />
     );
   }
@@ -777,7 +823,7 @@ function EditableKey({
 
   useEffect(() => {
     if (editing) {
-      inputRef.current?.focus();
+      inputRef.current?.focus({ preventScroll: true });
       inputRef.current?.select();
     }
   }, [editing]);
@@ -794,7 +840,7 @@ function EditableKey({
       return;
     }
     if (siblingKeys && siblingKeys.has(trimmed) && trimmed !== keyText) {
-      inputRef.current?.focus();
+      inputRef.current?.focus({ preventScroll: true });
       return;
     }
     setEditing(false);
@@ -823,10 +869,11 @@ function EditableKey({
           }
         }}
         className={[
-          'bg-bg-elev/60 px-1 rounded font-mono text-[13px] leading-6 outline-none ring-1 ring-accent-key/60 focus:ring-accent-key min-w-[4ch]',
+          // Capped width matching EditablePrimitive — prevents the row from
+          // expanding when the user clicks a long key name.
+          'bg-bg-elev/60 px-1 rounded font-mono text-[13px] leading-6 outline-none ring-1 ring-accent-key/60 focus:ring-accent-key w-[24ch] max-w-full',
           colorClass,
         ].join(' ')}
-        size={Math.max(draft.length + 1, 4)}
       />
     );
   }

@@ -164,15 +164,27 @@ export function Pane({
   }, [search.matches]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    // `min-w-0` is critical in compare mode: without it, a flex child
+    // defaults to `min-width: auto` and refuses to shrink below its
+    // content's intrinsic width. A row with a very long string would then
+    // push this pane wider than its 50% column and bleed visually into
+    // the other pane. With `min-w-0` the pane stays inside its column and
+    // the inner `overflow-auto` produces a horizontal scrollbar instead.
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {/* Pane header */}
       <div className="flex items-center justify-between border-b border-bg-elev bg-bg-panel px-4 py-2">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">
             {label}
           </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Pane stats — demoted from the left side so the label can stand
+           *  alone. Kept here as low-contrast contextual info next to the
+           *  toolbar; useful for debugging large payloads but no longer
+           *  dominates the empty header space. */}
           {parsed.ok && (
-            <span className="text-[11px] text-ink-muted font-mono">
+            <span className="hidden sm:inline-flex items-center text-[11px] text-ink-muted/70 font-mono mr-1 whitespace-nowrap">
               {countKeys(parsed.value)} keys · {approximateSize(raw)}
               {parsed.unescapedLevels > 0 && (
                 <span className="ml-2 text-accent-key">
@@ -180,14 +192,13 @@ export function Pane({
                 </span>
               )}
               {isCompareMode && typeof diffCount === 'number' && (
-                <span className="ml-2 text-ink-muted">
+                <span className="ml-2">
                   · {diffCount === 0 ? 'no diff' : `${diffCount} diff${diffCount === 1 ? '' : 's'}`}
                 </span>
               )}
             </span>
           )}
-        </div>
-        <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1">
           {/* Search button */}
           <button
             onClick={search.isOpen ? search.close : search.open}
@@ -286,6 +297,7 @@ export function Pane({
               </svg>
             </button>
           )}
+          </div>
         </div>
       </div>
 
