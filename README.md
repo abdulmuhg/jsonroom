@@ -47,24 +47,12 @@ npm install
 npm run dev
 ```
 
-Then open [http://localhost:5173](http://localhost:5173).
-
 ## Building for production
 
 ```bash
 npm run build
 npm run preview
 ```
-
-## Deployment
-
-JSONRoom deploys as a static site to Vercel or Cloudflare Pages.
-
-1. Push the repo to GitHub
-2. Import it into Vercel (or Cloudflare Pages)
-3. Use the default build settings: `npm run build`, output directory `dist`
-4. Add your custom subdomain (e.g. `json.yourdomain.com`) in the project's Domains tab
-5. Point a CNAME record from your DNS provider to the deployment target
 
 ## Roadmap
 
@@ -88,4 +76,4 @@ MIT. See [LICENSE](LICENSE).
 
 ---
 
-Built by Mr. A. If JSONRoom is useful to you, a ⭐ on [the repo](https://github.com/abdulmuhg/jsonroom) goes a long way.
+If JSONRoom is useful to you, a ⭐ on [the repo](https://github.com/abdulmuhg/jsonroom) goes a long way.
