@@ -17,6 +17,12 @@ export interface UseSearchReturn {
   matches: SearchMatch[];
   activeIndex: number;
   activeMatch: SearchMatch | null;
+  /**
+   * Bumped on every goNext/goPrev, even when the active index doesn't move
+   * (a single match wraps to itself). The view uses it to re-trigger
+   * scroll-into-view, which would otherwise be a dead click.
+   */
+  activeTick: number;
   matchPaths: Set<string>;
   expandPaths: Set<string>;
   goNext: () => void;
@@ -102,6 +108,7 @@ export function useSearch(value: unknown): UseSearchReturn {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [activeTick, setActiveTick] = useState(0);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query), 150);
@@ -115,6 +122,7 @@ export function useSearch(value: unknown): UseSearchReturn {
 
   useEffect(() => {
     setActiveIndex(0);
+    setActiveTick(0);
   }, [matches]);
 
   const expandPaths = useMemo(() => {
@@ -126,12 +134,14 @@ export function useSearch(value: unknown): UseSearchReturn {
 
   const goNext = useCallback(() => {
     setActiveIndex((i) => (matches.length === 0 ? 0 : (i + 1) % matches.length));
+    setActiveTick((t) => t + 1);
   }, [matches.length]);
 
   const goPrev = useCallback(() => {
     setActiveIndex((i) =>
       matches.length === 0 ? 0 : (i - 1 + matches.length) % matches.length,
     );
+    setActiveTick((t) => t + 1);
   }, [matches.length]);
 
   const open = useCallback(() => setIsOpen(true), []);
@@ -155,6 +165,7 @@ export function useSearch(value: unknown): UseSearchReturn {
     matches,
     activeIndex,
     activeMatch: matches[activeIndex] ?? null,
+    activeTick,
     matchPaths,
     expandPaths,
     goNext,
