@@ -9,6 +9,8 @@ interface Props {
   highlightPaths?: Map<string, 'added' | 'removed' | 'changed'>;
   searchMatches?: Map<string, SearchMatch>;
   activeMatchPath?: string;
+  /** Bumped by every search next/prev — re-triggers scroll-into-view. */
+  activeMatchTick?: number;
   expandPaths?: Set<string>;
   query?: string;
   caseSensitive?: boolean;
@@ -125,6 +127,7 @@ export function JsonView({
   highlightPaths,
   searchMatches,
   activeMatchPath,
+  activeMatchTick,
   expandPaths,
   query,
   caseSensitive,
@@ -180,6 +183,7 @@ export function JsonView({
         highlightPaths={highlightPaths}
         searchMatches={searchMatches}
         activeMatchPath={activeMatchPath}
+        activeMatchTick={activeMatchTick}
         expandPaths={expandPaths}
         query={query}
         caseSensitive={caseSensitive}
@@ -202,6 +206,8 @@ function Row({
   hlClass,
   children,
   rightActions,
+  active,
+  activeTick,
 }: {
   lineNo: number;
   hlClass?: string;
@@ -213,14 +219,48 @@ function Row({
    * off-screen and force the user to scroll horizontally to reach them.
    */
   rightActions?: ReactNode;
+  /** True when this row is the active search match — scrolls itself into view. */
+  active?: boolean;
+  /**
+   * Bumped by every next/prev. Included in the effect deps so that pressing
+   * next with a *single* match — which wraps to the same row and so leaves
+   * `active` unchanged — still re-scrolls instead of doing nothing.
+   */
+  activeTick?: number;
 }) {
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  // Scroll the active search match into view. This lives on the row rather
+  // than at the JsonView root because `expandPaths` can mount this row in the
+  // very same update that makes it active — an effect at the root would run
+  // against a node that doesn't exist yet. Keyed on `active`, it fires exactly
+  // when the row is both mounted and selected.
+  //
+  // `block: 'center'` keeps the hit away from the sticky header/gutter edges.
+  // `behavior: 'auto'` (not smooth) so holding Enter to step through matches
+  // doesn't queue up animations that fight each other.
+  //
+  // The ref goes on the *gutter* cell, not the row. The row div is only as
+  // wide as the scroll viewport while its content overflows to the right, so
+  // scrolling the row into view snaps `scrollLeft` back to 0 and throws away
+  // any horizontal scrolling the user did to read a long value. The gutter is
+  // `sticky left-0`, so it is always already at the visible left edge and
+  // `inline: 'nearest'` is a guaranteed no-op — only the vertical scroll moves.
+  useEffect(() => {
+    if (!active) return;
+    rowRef.current?.scrollIntoView({ block: 'center', inline: 'nearest' });
+  }, [active, activeTick]);
+
   return (
     <div className="flex group">
       {/* `sticky left-0` pins the gutter to the visible left edge so line
        *  numbers stay readable even when the row scrolls horizontally past
        *  the viewport. `z-20` keeps it above the row content (which itself
        *  has the right-edge sticky actions at z-10). */}
-      <div className="w-10 flex-shrink-0 select-none bg-bg-gutter text-right pr-2 text-ink-subtle text-[11px] leading-6 sticky left-0 z-20">
+      <div
+        ref={rowRef}
+        className="w-10 flex-shrink-0 select-none bg-bg-gutter text-right pr-2 text-ink-subtle text-[11px] leading-6 sticky left-0 z-20"
+      >
         {lineNo > 0 ? lineNo : ''}
       </div>
       {/* `border-l-2 border-transparent` reserves 2px of space on every row so
@@ -307,6 +347,7 @@ interface NodeProps {
   highlightPaths?: Map<string, 'added' | 'removed' | 'changed'>;
   searchMatches?: Map<string, SearchMatch>;
   activeMatchPath?: string;
+  activeMatchTick?: number;
   expandPaths?: Set<string>;
   query?: string;
   caseSensitive?: boolean;
@@ -332,6 +373,7 @@ function Node({
   highlightPaths,
   searchMatches,
   activeMatchPath,
+  activeMatchTick,
   expandPaths,
   query,
   caseSensitive,
@@ -382,6 +424,7 @@ function Node({
     highlightPaths,
     searchMatches,
     activeMatchPath,
+    activeMatchTick,
     expandPaths,
     query,
     caseSensitive,
@@ -438,7 +481,12 @@ function Node({
   // indent guides + key label + a subtle em-dash.
   if (kind === 'missing') {
     return (
-      <Row lineNo={openingLineNo} hlClass={rowHlClass}>
+      <Row
+        lineNo={openingLineNo}
+        hlClass={rowHlClass}
+        active={isActiveMatch}
+        activeTick={activeMatchTick}
+      >
         <Indent depth={depth} />
         {/* Two empty slots (chevron + copy) keep the key aligned with real rows. */}
         <span className="mr-1 w-4 flex-shrink-0" aria-hidden />
@@ -468,6 +516,8 @@ function Node({
         <Row
           lineNo={openingLineNo}
           hlClass={rowHlClass}
+          active={isActiveMatch}
+          activeTick={activeMatchTick}
           rightActions={
             <RowEditActions
               onAddChild={onAddChild ? () => onAddChild(path) : undefined}
@@ -532,6 +582,8 @@ function Node({
     <Row
       lineNo={openingLineNo}
       hlClass={rowHlClass}
+      active={isActiveMatch}
+      activeTick={activeMatchTick}
       rightActions={
         <RowEditActions
           onDelete={onDelete && path !== '' ? () => onDelete(path) : undefined}

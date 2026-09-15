@@ -380,6 +380,7 @@ export function Pane({
             highlightPaths={highlightPaths}
             searchMatches={searchMatchMap}
             activeMatchPath={search.activeMatch?.path}
+            activeMatchTick={search.activeTick}
             expandPaths={search.expandPaths}
             query={search.query}
             caseSensitive={search.caseSensitive}
