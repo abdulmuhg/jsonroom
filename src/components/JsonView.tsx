@@ -207,7 +207,7 @@ function Row({
   hlClass?: string;
   children: ReactNode;
   /**
-   * Per-row action buttons (copy, add, delete) that should "stick" to the
+   * Per-row action buttons (add, delete) that should "stick" to the
    * right edge of the visible viewport when the row is wider than the
    * scrolling container. Without this, long values push the buttons
    * off-screen and force the user to scroll horizontally to reach them.
@@ -235,13 +235,13 @@ function Row({
         {children}
         {rightActions && (
           <span
-            // `sticky right-0` keeps the action group pinned to the right
-            // edge of the scroll viewport even when the row's content is
-            // wider than the container. `ml-auto` pushes it to the right
-            // when the row content is narrower (no scroll). The background
-            // gradient hides any value text that would otherwise sit
-            // underneath the pinned buttons.
-            className="ml-auto sticky right-0 pl-4 flex items-center bg-gradient-to-l from-bg-base via-bg-base/95 to-transparent z-10"
+            // The action group sits directly after the row content so it's
+            // obvious which field it acts on. `sticky right-0` still pins it
+            // to the right edge of the scroll viewport when the row's content
+            // is wider than the container. The hover-only background hides
+            // any value text underneath the pinned buttons without leaving a
+            // dark patch on highlighted rows at rest.
+            className="sticky right-0 pl-1 pr-2 flex items-center z-10 group-hover:bg-gradient-to-l group-hover:from-bg-base group-hover:via-bg-base/95 group-hover:to-transparent"
           >
             {rightActions}
           </span>
@@ -440,6 +440,8 @@ function Node({
     return (
       <Row lineNo={openingLineNo} hlClass={rowHlClass}>
         <Indent depth={depth} />
+        {/* Two empty slots (chevron + copy) keep the key aligned with real rows. */}
+        <span className="mr-1 w-4 flex-shrink-0" aria-hidden />
         <span className="mr-1 w-4 flex-shrink-0" aria-hidden />
         {renderKey()}
         <span className="text-ink-subtle/60 italic select-none">—</span>
@@ -467,14 +469,11 @@ function Node({
           lineNo={openingLineNo}
           hlClass={rowHlClass}
           rightActions={
-            <>
-              <CopyButton value={value} block />
-              <RowEditActions
-                onAddChild={onAddChild ? () => onAddChild(path) : undefined}
-                onDelete={onDelete && path !== '' ? () => onDelete(path) : undefined}
-                addLabel={kind === 'array' ? 'Add item' : 'Add key'}
-              />
-            </>
+            <RowEditActions
+              onAddChild={onAddChild ? () => onAddChild(path) : undefined}
+              onDelete={onDelete && path !== '' ? () => onDelete(path) : undefined}
+              addLabel={kind === 'array' ? 'Add item' : 'Add key'}
+            />
           }
         >
           <Indent depth={depth} />
@@ -485,6 +484,7 @@ function Node({
           >
             <Chevron open={open} />
           </button>
+          <CopyButton value={value} block />
           {renderKey()}
           <span className="text-ink-secondary">{open_br}</span>
           {!open && (
@@ -516,7 +516,7 @@ function Node({
             ))}
             <Row lineNo={closingLineNo} hlClass={diffClass}>
               <Indent depth={depth} />
-              <span className="text-ink-secondary ml-5">
+              <span className="text-ink-secondary ml-10">
                 {close_br}
                 {trailingComma ? ',' : ''}
               </span>
@@ -533,16 +533,14 @@ function Node({
       lineNo={openingLineNo}
       hlClass={rowHlClass}
       rightActions={
-        <>
-          <CopyButton value={value} />
-          <RowEditActions
-            onDelete={onDelete && path !== '' ? () => onDelete(path) : undefined}
-          />
-        </>
+        <RowEditActions
+          onDelete={onDelete && path !== '' ? () => onDelete(path) : undefined}
+        />
       }
     >
       <Indent depth={depth} />
       <span className="mr-1 w-4 flex-shrink-0" aria-hidden />
+      <CopyButton value={value} />
       {renderKey()}
       {onEditValue ? (
         <EditablePrimitive
@@ -649,7 +647,9 @@ function CopyButton({ value, block }: { value: unknown; block?: boolean }) {
       onClick={handleCopy}
       aria-label={block ? 'Copy block' : 'Copy value'}
       title={block ? 'Copy block' : 'Copy value'}
-      className="ml-2 opacity-0 group-hover:opacity-100 text-ink-muted hover:text-ink-primary transition-opacity flex-shrink-0"
+      // Fixed-width slot before the key: always reachable regardless of how
+      // long the value is, and keeps keys aligned across rows.
+      className="mr-1 flex h-6 w-4 items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-ink-muted hover:text-ink-primary transition-opacity flex-shrink-0"
     >
       {copied ? (
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" width={12} height={12}>
