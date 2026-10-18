@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Theme } from '../hooks/useTheme';
-import { THEME_LABELS, THEMES } from '../hooks/useTheme';
+import { THEME_LABELS, THEMES, isLightTheme } from '../hooks/useTheme';
 
 interface Props {
   theme: Theme;
@@ -9,7 +9,7 @@ interface Props {
 
 /** Trigger icon — shows a distinct glyph per active theme. */
 function ThemeIcon({ theme }: { theme: Theme }) {
-  if (theme === 'light') {
+  if (isLightTheme(theme)) {
     // Sun
     return (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" width={14} height={14}>
@@ -21,7 +21,7 @@ function ThemeIcon({ theme }: { theme: Theme }) {
       </svg>
     );
   }
-  if (theme === 'dark') {
+  if (theme !== 'default') {
     // Moon
     return (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" width={14} height={14}>
@@ -46,16 +46,19 @@ function ThemeIcon({ theme }: { theme: Theme }) {
   );
 }
 
+const SWATCHES: Record<Theme, { bg: string; panel: string; accent: string }> = {
+  default: { bg: '#1a1e26', panel: '#22272f', accent: '#e07b4f' },
+  dark: { bg: '#262624', panel: '#1f1e1d', accent: '#6fb0a4' },
+  light: { bg: '#faf9f5', panel: '#e8e6db', accent: '#7b2589' },
+  'plain-dark': { bg: '#161616', panel: '#2a2a2a', accent: '#9db4d6' },
+  'plain-light': { bg: '#ffffff', panel: '#e5e5e5', accent: '#2d5a96' },
+};
+
 /** Small preview swatch for each theme in the popover. */
 function ThemeSwatch({ theme }: { theme: Theme }) {
   // Hard-coded mini-previews so the swatch looks right regardless of the
   // currently active theme — using CSS vars here would all render the same.
-  const palette =
-    theme === 'light'
-      ? { bg: '#faf9f5', panel: '#e8e6db', accent: '#7b2589' }
-      : theme === 'dark'
-        ? { bg: '#262624', panel: '#1f1e1d', accent: '#6fb0a4' }
-        : { bg: '#1a1e26', panel: '#22272f', accent: '#e07b4f' };
+  const palette = SWATCHES[theme];
 
   return (
     <span

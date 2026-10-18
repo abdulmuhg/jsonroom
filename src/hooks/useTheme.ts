@@ -6,21 +6,32 @@ import { useCallback, useEffect, useState } from 'react';
  *  - `default` — the original JSONRoom look (cool blue-gray with orange accents)
  *  - `dark`    — Claude-inspired warm stone
  *  - `light`   — Claude-inspired warm cream paper
+ *  - `plain-dark` / `plain-light` — neutral grays with soft syntax colors
+ *
+ * The inline script in index.html keeps its own copy of this list so it can
+ * apply the theme before first paint; add new themes there too.
  */
-export type Theme = 'default' | 'dark' | 'light';
+export type Theme = 'default' | 'dark' | 'light' | 'plain-dark' | 'plain-light';
 
-export const THEMES: Theme[] = ['default', 'dark', 'light'];
+export const THEMES: Theme[] = ['default', 'dark', 'light', 'plain-dark', 'plain-light'];
 
 export const THEME_LABELS: Record<Theme, string> = {
   default: 'Default',
   dark: 'Dark',
   light: 'Light',
+  'plain-dark': 'Plain Dark',
+  'plain-light': 'Plain Light',
 };
+
+/** Themes drawn on a light background. Everything else is dark. */
+export function isLightTheme(theme: Theme): boolean {
+  return theme === 'light' || theme === 'plain-light';
+}
 
 export const THEME_STORAGE_KEY = 'jsonroom.theme.v1';
 
 function isTheme(v: unknown): v is Theme {
-  return v === 'default' || v === 'dark' || v === 'light';
+  return (THEMES as unknown[]).includes(v);
 }
 
 /** Read the persisted theme, falling back to `default`. */
@@ -44,7 +55,7 @@ export function applyTheme(theme: Theme): void {
   // Keep the legacy `dark` class in sync with the active theme so any
   // `dark:` Tailwind utilities (none in use today, but harmless) behave
   // as expected. `default` is a dark theme.
-  if (theme === 'light') {
+  if (isLightTheme(theme)) {
     root.classList.remove('dark');
   } else {
     root.classList.add('dark');
