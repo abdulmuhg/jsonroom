@@ -260,7 +260,7 @@ function Row({
        *  horizontal jitter. Highlight classes only set color now, not width. */}
       <div
         className={[
-          'flex-1 min-w-0 pl-3 flex items-center border-l-2 border-transparent',
+          'flex-1 min-w-0 pl-1.5 flex items-center border-l-2 border-transparent',
           hlClass ?? '',
         ].join(' ')}
       >

@@ -3,6 +3,7 @@ import { TabBar } from './components/TabBar';
 import { Pane } from './components/Pane';
 import { Intro } from './components/Intro';
 import { ThemeSwitcher } from './components/ThemeSwitcher';
+import { MoreMenu } from './components/MoreMenu';
 import { useTabs } from './hooks/useTabs';
 import { useTheme } from './hooks/useTheme';
 import { parseJson } from './lib/parseJson';
@@ -28,6 +29,8 @@ export default function App() {
   const { tabs, activeId, activeTab, addTab, closeTab, updateTab, setActive } = useTabs();
   const { theme, setTheme } = useTheme();
   const [showIntro, setShowIntro] = useState<boolean>(() => shouldShowIntro());
+  // Where the single pane renders its toolbar (the top bar), via a portal.
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
 
   const dismissIntro = () => {
     setShowIntro(false);
@@ -114,53 +117,42 @@ export default function App() {
 
   return (
     <div className="flex h-screen flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-bg-elev bg-bg-panel px-4 py-2">
-        <div className="flex items-center gap-2.5">
-          {/* Brand mark — mirrors favicon.svg. Colors follow the active theme. */}
-          <svg width="22" height="22" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      {/* Top bar — brand, tabs, and (in single mode) the pane's toolbar in one row. */}
+      <header className="flex items-center gap-2 border-b border-bg-elev bg-bg-panel px-2 py-1">
+        {/* Brand mark — mirrors favicon.svg. Colors follow the active theme. */}
+        <div className="flex flex-shrink-0 items-center gap-2 pl-1 pr-1" title="JSONRoom · a quiet room for your JSON">
+          <svg width="20" height="20" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <rect width="32" height="32" rx="8" className="fill-bg-base" />
             <path d="M13.5 7.5H12C10.3 7.5 9.5 8.4 9.5 10v3.5c0 .9-.35 1.3-.9 1.5v1c.55.2.9.6.9 1.5V21c0 1.6.8 2.5 2.5 2.5h1.5" className="stroke-accent-key" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M18.5 7.5H20c1.7 0 2.5.9 2.5 2.5v3.5c0 .9.35 1.3.9 1.5v1c-.55.2-.9.6-.9 1.5V21c0 1.6-.8 2.5-2.5 2.5h-1.5" className="stroke-accent-key" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <circle cx="16" cy="16" r="1.6" className="fill-accent-string" />
           </svg>
-          <span className="font-semibold tracking-tight text-ink-primary">JSONRoom</span>
-          <span className="hidden sm:inline text-[11px] text-ink-subtle">·</span>
-          <span className="hidden sm:inline text-[11px] text-ink-subtle">a quiet room for your JSON</span>
+          <span className="hidden md:inline text-sm font-semibold tracking-tight text-ink-primary">JSONRoom</span>
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-ink-muted">
-          <button
-            onClick={() => setShowIntro(true)}
-            className="ml-3 text-ink-muted hover:text-accent-key"
-            title="Replay intro"
-          >
-            meet Mr. J
-          </button>
-          <a
-            href="https://github.com/abdulmuhg/jsonroom"
-            target="_blank"
-            rel="noreferrer"
-            className="text-ink-muted hover:text-accent-key"
-          >
-            contribute
-          </a>
+        <div className="h-4 w-px flex-shrink-0 bg-bg-elev" aria-hidden />
+
+        <TabBar
+          tabs={tabs}
+          activeId={activeId}
+          onSelect={setActive}
+          onClose={closeTab}
+          onAdd={addTab}
+          onRename={(id, name) => updateTab(id, { name })}
+        />
+
+        {/* The single pane portals its stats and actions in here. */}
+        <div ref={setToolbarSlot} className="flex flex-shrink-0 items-center" />
+        <div className="flex flex-shrink-0 items-center gap-1 border-l border-bg-elev pl-1">
+          <MoreMenu onShowIntro={() => setShowIntro(true)} />
           <ThemeSwitcher theme={theme} onChange={setTheme} />
         </div>
       </header>
 
-      <TabBar
-        tabs={tabs}
-        activeId={activeId}
-        onSelect={setActive}
-        onClose={closeTab}
-        onAdd={addTab}
-        onRename={(id, name) => updateTab(id, { name })}
-      />
-
       {/* Panes */}
       <main className="flex min-h-0 flex-1">
         <Pane
-          label={activeTab.mode === 'compare' ? 'Left' : 'JSON'}
+          label="Left"
+          toolbarSlot={activeTab.mode === 'compare' ? undefined : toolbarSlot}
           raw={activeTab.leftRaw}
           onChange={(raw) => updateTab(activeId, { leftRaw: raw })}
           diffEntries={activeTab.mode === 'compare' ? diffEntries : undefined}
