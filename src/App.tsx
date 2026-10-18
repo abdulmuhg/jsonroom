@@ -8,7 +8,7 @@ import { useTheme } from './hooks/useTheme';
 import { parseJson } from './lib/parseJson';
 import { diffJson } from './lib/diff';
 import { unifyTrees } from './lib/unify';
-import { matchShortcut } from './lib/shortcuts';
+import { isEditableTarget, matchShortcut } from './lib/shortcuts';
 
 const INTRO_SEEN_KEY = 'jsonroom.introSeen.v1';
 
@@ -52,6 +52,7 @@ export default function App() {
       if (showIntro) return; // Intro handles its own keys.
       const shortcut = matchShortcut(e);
       if (!shortcut) return;
+      if ((shortcut === 'newTab' || shortcut === 'closeTab') && isEditableTarget(e.target)) return;
       e.preventDefault();
       if (shortcut === 'search') {
         const side = activeTab.mode === 'compare' ? lastPaneRef.current : 'left';
