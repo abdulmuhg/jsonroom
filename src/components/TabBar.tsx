@@ -43,7 +43,7 @@ export function TabBar({ tabs, activeId, onSelect, onClose, onAdd, onRename }: P
   }
 
   return (
-    <div className="flex items-center gap-1 border-b border-bg-elev bg-bg-panel px-2 py-1 overflow-x-auto scrollbar-thin">
+    <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-thin">
       {tabs.map((tab) => {
         const active = tab.id === activeId;
         const isEditing = tab.id === editingId;
@@ -53,7 +53,7 @@ export function TabBar({ tabs, activeId, onSelect, onClose, onAdd, onRename }: P
             onClick={() => !isEditing && onSelect(tab.id)}
             onDoubleClick={() => startEdit(tab)}
             className={
-              'group flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors cursor-pointer ' +
+              'group flex flex-shrink-0 items-center gap-1 rounded-md py-1 pl-2.5 pr-1 text-[13px] transition-colors cursor-pointer ' +
               (active
                 ? 'bg-bg-elev text-ink-primary'
                 : 'text-ink-secondary hover:bg-bg-hover hover:text-ink-primary')
@@ -95,7 +95,10 @@ export function TabBar({ tabs, activeId, onSelect, onClose, onAdd, onRename }: P
                   e.stopPropagation();
                   onClose(tab.id);
                 }}
-                className="ml-1 h-4 w-4 flex items-center justify-center rounded text-ink-muted opacity-0 group-hover:opacity-100 hover:bg-bg-hover hover:text-ink-primary"
+                className={
+                  'h-4 w-4 flex items-center justify-center rounded text-ink-muted hover:bg-bg-hover hover:text-ink-primary ' +
+                  (active ? 'opacity-60 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100')
+                }
               >
                 ×
               </span>
@@ -105,7 +108,7 @@ export function TabBar({ tabs, activeId, onSelect, onClose, onAdd, onRename }: P
       })}
       <button
         onClick={onAdd}
-        className="ml-1 rounded-md px-3 py-1.5 text-sm text-ink-muted hover:bg-bg-hover hover:text-ink-primary"
+        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-sm text-ink-muted hover:bg-bg-hover hover:text-ink-primary"
         title={`New tab (${SHORTCUT_LABELS.newTab})`}
       >
         +
