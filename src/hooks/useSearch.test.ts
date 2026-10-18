@@ -5,7 +5,7 @@ describe('collectMatches', () => {
   it('finds matching string values', () => {
     const result = collectMatches({ name: 'Alice', age: 30 }, 'ali', false);
     expect(result).toHaveLength(1);
-    expect(result[0].path).toBe('name');
+    expect(result[0].path).toBe('/name');
     expect(result[0].matchesKey).toBe(false);
     expect(result[0].matchesValue).toBe(true);
   });
@@ -13,20 +13,20 @@ describe('collectMatches', () => {
   it('finds matching keys', () => {
     const result = collectMatches({ username: 'bob' }, 'user', false);
     expect(result).toHaveLength(1);
-    expect(result[0].path).toBe('username');
+    expect(result[0].path).toBe('/username');
     expect(result[0].matchesKey).toBe(true);
   });
 
   it('finds nested string values', () => {
     const result = collectMatches({ user: { email: 'test@example.com' } }, 'test', false);
     expect(result).toHaveLength(1);
-    expect(result[0].path).toBe('user.email');
+    expect(result[0].path).toBe('/user/email');
   });
 
   it('finds values in arrays', () => {
     const result = collectMatches({ items: ['apple', 'banana'] }, 'banana', false);
     expect(result).toHaveLength(1);
-    expect(result[0].path).toBe('items[1]');
+    expect(result[0].path).toBe('/items/1');
   });
 
   it('is case-insensitive by default', () => {
@@ -67,7 +67,7 @@ describe('collectMatches', () => {
 
   it('records both matchesKey and matchesValue when both match', () => {
     const result = collectMatches({ name: 'name is a common key' }, 'name', false);
-    const nameMatch = result.find(m => m.path === 'name');
+    const nameMatch = result.find(m => m.path === '/name');
     expect(nameMatch?.matchesKey).toBe(true);
     expect(nameMatch?.matchesValue).toBe(true);
   });
@@ -79,37 +79,37 @@ describe('collectMatches', () => {
     const result = collectMatches({ user: { name: 'user' } }, 'user', false);
     expect(result).toHaveLength(2);
     const paths = result.map((m) => m.path).sort();
-    expect(paths).toEqual(['user', 'user.name']);
-    const containerMatch = result.find((m) => m.path === 'user');
+    expect(paths).toEqual(['/user', '/user/name']);
+    const containerMatch = result.find((m) => m.path === '/user');
     expect(containerMatch?.matchesKey).toBe(true);
     expect(containerMatch?.matchesValue).toBe(false);
-    const leafMatch = result.find((m) => m.path === 'user.name');
+    const leafMatch = result.find((m) => m.path === '/user/name');
     expect(leafMatch?.matchesValue).toBe(true);
   });
 });
 
 describe('getAncestors', () => {
   it('returns empty array for top-level paths', () => {
-    expect(getAncestors('name')).toEqual([]);
+    expect(getAncestors('/name')).toEqual([]);
   });
 
   it('returns parent for dot-notation paths', () => {
-    expect(getAncestors('user.email')).toEqual(['user']);
+    expect(getAncestors('/user/email')).toEqual(['/user']);
   });
 
   it('returns all ancestors for deeply nested paths', () => {
-    expect(getAncestors('user.address.city')).toEqual(['user.address', 'user']);
+    expect(getAncestors('/user/address/city')).toEqual(['/user/address', '/user']);
   });
 
   it('returns parent for array index paths', () => {
-    expect(getAncestors('items[0]')).toEqual(['items']);
+    expect(getAncestors('/items/0')).toEqual(['/items']);
   });
 
   it('returns all ancestors for mixed dot-and-array paths', () => {
-    expect(getAncestors('items[0].name')).toEqual(['items[0]', 'items']);
+    expect(getAncestors('/items/0/name')).toEqual(['/items/0', '/items']);
   });
 
   it('handles deeply nested array paths', () => {
-    expect(getAncestors('a.b[2].c')).toEqual(['a.b[2]', 'a.b', 'a']);
+    expect(getAncestors('/a/b/2/c')).toEqual(['/a/b/2', '/a/b', '/a']);
   });
 });
