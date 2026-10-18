@@ -10,6 +10,8 @@ interface Props {
   onNext: () => void;
   onPrev: () => void;
   onClose: () => void;
+  /** Changes whenever focus is requested again (⌘/Ctrl+F while already open). */
+  focusSignal?: number;
 }
 
 export function SearchBar({
@@ -22,12 +24,16 @@ export function SearchBar({
   onNext,
   onPrev,
   onClose,
+  focusSignal,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Focus on open, and again on every repeat request. Selecting lets the
+  // user type over the previous query, as in browser find.
   useEffect(() => {
     inputRef.current?.focus();
-  }, []);
+    inputRef.current?.select();
+  }, [focusSignal]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {

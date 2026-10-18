@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Tab } from '../hooks/useTabs';
+import { SHORTCUT_LABELS } from '../lib/shortcuts';
 
 interface Props {
   tabs: Tab[];
@@ -89,6 +90,7 @@ export function TabBar({ tabs, activeId, onSelect, onClose, onAdd, onRename }: P
               <span
                 role="button"
                 aria-label="Close tab"
+                title={`Close tab (${SHORTCUT_LABELS.closeTab})`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onClose(tab.id);
@@ -104,7 +106,7 @@ export function TabBar({ tabs, activeId, onSelect, onClose, onAdd, onRename }: P
       <button
         onClick={onAdd}
         className="ml-1 rounded-md px-3 py-1.5 text-sm text-ink-muted hover:bg-bg-hover hover:text-ink-primary"
-        title="New tab (⌘/Ctrl + T)"
+        title={`New tab (${SHORTCUT_LABELS.newTab})`}
       >
         +
       </button>
