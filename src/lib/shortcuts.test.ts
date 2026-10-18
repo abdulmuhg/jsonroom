@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchShortcut, type ShortcutEvent } from './shortcuts';
+import { isEditableTarget, matchShortcut, type ShortcutEvent } from './shortcuts';
 
 function ev(partial: Partial<ShortcutEvent>): ShortcutEvent {
   return { key: '', code: '', ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...partial };
@@ -55,5 +55,20 @@ describe('matchShortcut', () => {
   it('ignores plain keys', () => {
     expect(matchShortcut(ev({ key: 'f', code: 'KeyF' }))).toBeNull();
     expect(matchShortcut(ev({ key: 't', code: 'KeyT' }))).toBeNull();
+  });
+});
+
+describe('isEditableTarget', () => {
+  it('flags text fields', () => {
+    expect(isEditableTarget({ tagName: 'TEXTAREA' })).toBe(true);
+    expect(isEditableTarget({ tagName: 'INPUT' })).toBe(true);
+    expect(isEditableTarget({ tagName: 'DIV', isContentEditable: true })).toBe(true);
+  });
+
+  it('passes everything else', () => {
+    expect(isEditableTarget({ tagName: 'DIV', isContentEditable: false })).toBe(false);
+    expect(isEditableTarget({ tagName: 'BUTTON' })).toBe(false);
+    expect(isEditableTarget(null)).toBe(false);
+    expect(isEditableTarget({})).toBe(false);
   });
 });

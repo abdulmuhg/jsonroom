@@ -31,6 +31,17 @@ function letterOf(e: ShortcutEvent): string {
   return m ? m[1].toLowerCase() : '';
 }
 
+/**
+ * True when the event comes from a text field. The tab shortcuts stand down
+ * there: Option+T/W type characters on macOS, and Alt+W mid-paste would close
+ * the tab and lose what was typed.
+ */
+export function isEditableTarget(target: unknown): boolean {
+  if (!target || typeof target !== 'object') return false;
+  const el = target as { tagName?: string; isContentEditable?: boolean };
+  return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable === true;
+}
+
 export function matchShortcut(e: ShortcutEvent): Shortcut | null {
   if (e.shiftKey) return null;
   const letter = letterOf(e);
