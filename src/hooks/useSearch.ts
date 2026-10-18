@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ROOT_PATH, childPath, getAncestors } from '../lib/jsonPath';
 
 export interface SearchMatch {
   path: string;
@@ -37,30 +38,12 @@ export function collectMatches(
 ): SearchMatch[] {
   if (!query) return [];
   const results: SearchMatch[] = [];
-  traverseNode(value, '', null, query, caseSensitive, results);
+  traverseNode(value, ROOT_PATH, null, query, caseSensitive, results);
   return results;
 }
 
 // Exported for testing.
-export function getAncestors(path: string): string[] {
-  const ancestors: string[] = [];
-  let current = path;
-  while (current.length > 0) {
-    const arrayMatch = current.match(/^(.*)\[\d+\]$/);
-    if (arrayMatch) {
-      current = arrayMatch[1];
-    } else {
-      const dotIdx = current.lastIndexOf('.');
-      if (dotIdx === -1) {
-        current = '';
-      } else {
-        current = current.slice(0, dotIdx);
-      }
-    }
-    if (current !== '') ancestors.push(current);
-  }
-  return ancestors;
-}
+export { getAncestors };
 
 function traverseNode(
   value: unknown,
@@ -92,12 +75,11 @@ function traverseNode(
 
   if (Array.isArray(value)) {
     (value as unknown[]).forEach((item, i) => {
-      traverseNode(item, `${path}[${i}]`, i, query, caseSensitive, results);
+      traverseNode(item, childPath(path, i), i, query, caseSensitive, results);
     });
   } else {
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      const childPath = path === '' ? k : `${path}.${k}`;
-      traverseNode(v, childPath, k, query, caseSensitive, results);
+      traverseNode(v, childPath(path, k), k, query, caseSensitive, results);
     }
   }
 }

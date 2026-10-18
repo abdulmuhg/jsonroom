@@ -3,6 +3,7 @@ import type { ReactNode, MutableRefObject } from 'react';
 import type { SearchMatch } from '../hooks/useSearch';
 import { isMissing } from '../lib/unify';
 import { coerceInputToJson } from '../lib/editPath';
+import { childPath } from '../lib/jsonPath';
 
 interface Props {
   value: unknown;
@@ -61,15 +62,6 @@ function typeLabel(v: unknown): string {
   return typeof v;
 }
 
-/** Path resolution matches the Node component exactly — keep in sync. */
-function childPath(
-  parentPath: string,
-  key: string | number,
-  parentKind: 'array' | 'object',
-): string {
-  if (parentKind === 'array') return `${parentPath}[${key}]`;
-  return parentPath === '' ? String(key) : `${parentPath}.${String(key)}`;
-}
 
 function isNodeOpen(
   path: string,
@@ -104,7 +96,7 @@ function computeLineNumbers(
             : Object.entries(v as Record<string, unknown>);
         map.set(path, { opening });
         for (const [k, cv] of entries) {
-          walk(cv, childPath(path, k, kind as 'array' | 'object'), depth + 1);
+          walk(cv, childPath(path, k), depth + 1);
         }
         const closing = ++counter.n;
         map.set(path, { opening, closing });
@@ -556,7 +548,7 @@ function Node({
                 key={String(k)}
                 name={k as string | number}
                 value={v}
-                path={childPath(path, k, childKindForChildren)}
+                path={childPath(path, k)}
                 depth={depth + 1}
                 trailingComma={idx < entries.length - 1}
                 parentKind={childKindForChildren}
