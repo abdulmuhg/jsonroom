@@ -5,10 +5,12 @@
 /* ---------------------------------------------------------------------------
  * Theme tokens
  *
- * Three themes:
+ * Five themes:
  *   :root / [data-theme="default"]  — original cool blue-gray with warm accents
  *   [data-theme="dark"]             — Claude-inspired warm stone
  *   [data-theme="light"]            — Claude-inspired warm cream paper
+ *   [data-theme="plain-dark"]       — neutral grays, soft syntax colors
+ *   [data-theme="plain-light"]      — the same on white
  *
  * Tokens are referenced via CSS variables by tailwind.config.js.
  * ------------------------------------------------------------------------- */
@@ -130,6 +132,82 @@
   --selection-bg: rgba(123, 37, 137, 0.18);
   --scrollbar-thumb: #c2c0b6;
   --scrollbar-thumb-hover: #a8a69b;
+
+  color-scheme: light;
+}
+
+[data-theme='plain-dark'] {
+  /* Plain neutral grays — no warm or cool tint — with soft, low-saturation
+     syntax colors so each JSON category still has its own hue. */
+  --color-bg-base: #161616;
+  --color-bg-panel: #1c1c1c;
+  --color-bg-elev: #2a2a2a;
+  --color-bg-hover: #303030;
+  --color-bg-gutter: #191919;
+
+  --color-ink-primary: #e6e6e6;
+  --color-ink-secondary: #b0b0b0;
+  --color-ink-muted: #808080;
+  --color-ink-subtle: #555555;
+
+  --color-accent-key: #9db4d6;     /* soft blue */
+  --color-accent-string: #a9c49b;  /* sage */
+  --color-accent-number: #d6b48c;  /* sand */
+  --color-accent-bool: #cf9f9f;    /* dusty rose */
+
+  --color-diff-add: #6f9f78;
+  --color-diff-add-bg: rgba(111, 159, 120, 0.16);
+  --color-diff-remove: #c27a7a;
+  --color-diff-remove-bg: rgba(194, 122, 122, 0.16);
+  --color-diff-change: #b8944f;
+  --color-diff-change-bg: rgba(184, 148, 79, 0.16);
+
+  --color-search-match: rgba(255, 255, 255, 0.10);
+  --color-search-match-border: rgba(255, 255, 255, 0.35);
+  --color-search-active: rgba(214, 180, 140, 0.35);
+  --color-search-active-border: #d6b48c;
+
+  --selection-bg: rgba(157, 180, 214, 0.30);
+  --scrollbar-thumb: #333333;
+  --scrollbar-thumb-hover: #444444;
+
+  color-scheme: dark;
+}
+
+[data-theme='plain-light'] {
+  /* The same plain grays on white, with deeper versions of the soft syntax
+     colors so they hold contrast on a light page. */
+  --color-bg-base: #ffffff;
+  --color-bg-panel: #f6f6f6;
+  --color-bg-elev: #e5e5e5;
+  --color-bg-hover: #ececec;
+  --color-bg-gutter: #fafafa;
+
+  --color-ink-primary: #1f1f1f;
+  --color-ink-secondary: #4d4d4d;
+  --color-ink-muted: #737373;
+  --color-ink-subtle: #a3a3a3;
+
+  --color-accent-key: #2d5a96;     /* slate blue */
+  --color-accent-string: #3f7a3a;  /* moss */
+  --color-accent-number: #975a16;  /* ochre */
+  --color-accent-bool: #a33b3b;    /* brick */
+
+  --color-diff-add: #2f7a3e;
+  --color-diff-add-bg: rgba(47, 122, 62, 0.10);
+  --color-diff-remove: #b33a3a;
+  --color-diff-remove-bg: rgba(179, 58, 58, 0.09);
+  --color-diff-change: #8a6210;
+  --color-diff-change-bg: rgba(166, 124, 31, 0.12);
+
+  --color-search-match: rgba(0, 0, 0, 0.07);
+  --color-search-match-border: rgba(0, 0, 0, 0.30);
+  --color-search-active: rgba(240, 200, 60, 0.40);
+  --color-search-active-border: #a67c1f;
+
+  --selection-bg: rgba(45, 90, 150, 0.18);
+  --scrollbar-thumb: #cfcfcf;
+  --scrollbar-thumb-hover: #b5b5b5;
 
   color-scheme: light;
 }

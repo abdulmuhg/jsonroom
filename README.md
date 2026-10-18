@@ -22,7 +22,7 @@ JSONRoom is hosted by **Mr. J** — a polite fellow who opens the door when you 
 ## Features
 
 - A warm welcome on first visit (skippable, shown once)
-- High-contrast dark theme optimized for screen sharing
+- High-contrast dark theme optimized for screen sharing, plus Dark, Light, Plain Dark and Plain Light themes in the header's theme menu
 - Smart paste — auto-unescapes double-escaped JSON and strips log-line prefixes
 - Fix broken JSON — repairs trailing commas, single quotes, unquoted keys, comments, missing commas, JS literals (`undefined`, `NaN`, `Infinity`), and mismatched brackets
 - Copy all — one-click copy button for the entire JSON in each pane
@@ -61,7 +61,6 @@ Small, focused scope. Contributions welcome:
 - [ ] Table view for arrays of objects
 - [ ] Command palette (`Cmd/Ctrl + K`)
 - [ ] Copy JSONPath from any node (context menu)
-- [ ] Light theme (opt-in)
 - [ ] Import from URL (with optional CORS proxy)
 - [ ] Semantic diff mode (ignore key ordering, treat arrays as sets)
 - [ ] Presentation mode (boost font, hide chrome)

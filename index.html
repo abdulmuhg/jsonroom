@@ -16,9 +16,9 @@
       (function () {
         try {
           var t = localStorage.getItem('jsonroom.theme.v1');
-          if (t !== 'default' && t !== 'dark' && t !== 'light') t = 'default';
+          if (['default', 'dark', 'light', 'plain-dark', 'plain-light'].indexOf(t) === -1) t = 'default';
           document.documentElement.setAttribute('data-theme', t);
-          if (t === 'light') document.documentElement.classList.remove('dark');
+          if (t === 'light' || t === 'plain-light') document.documentElement.classList.remove('dark');
           else document.documentElement.classList.add('dark');
         } catch (_) { /* ignore */ }
       })();
