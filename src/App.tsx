@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TabBar } from './components/TabBar';
 import { Pane } from './components/Pane';
 import { Intro } from './components/Intro';
@@ -8,6 +8,7 @@ import { useTheme } from './hooks/useTheme';
 import { parseJson } from './lib/parseJson';
 import { diffJson } from './lib/diff';
 import { unifyTrees } from './lib/unify';
+import { matchShortcut } from './lib/shortcuts';
 
 const INTRO_SEEN_KEY = 'jsonroom.introSeen.v1';
 
@@ -37,20 +38,32 @@ export default function App() {
     }
   };
 
+  // The pane the user last clicked or focused — where ⌘/Ctrl+F opens search.
+  const lastPaneRef = useRef<'left' | 'right'>('left');
+  // Bumped per ⌘/Ctrl+F; the target pane opens (or refocuses) its search bar.
+  const [searchRequest, setSearchRequest] = useState<{ side: 'left' | 'right'; n: number }>({
+    side: 'left',
+    n: 0,
+  });
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (showIntro) return; // Intro handles its own keys.
-      const meta = e.metaKey || e.ctrlKey;
-      if (!meta) return;
-      if (e.key === 'w') {
-        e.preventDefault();
-        closeTab(activeId);
-      } else if (e.key === 'd') {
-        e.preventDefault();
+      const shortcut = matchShortcut(e);
+      if (!shortcut) return;
+      e.preventDefault();
+      if (shortcut === 'search') {
+        const side = activeTab.mode === 'compare' ? lastPaneRef.current : 'left';
+        setSearchRequest((r) => ({ side, n: r.n + 1 }));
+      } else if (shortcut === 'compare') {
         updateTab(activeId, {
           mode: activeTab.mode === 'compare' ? 'single' : 'compare',
         });
+      } else if (shortcut === 'newTab') {
+        addTab();
+      } else if (shortcut === 'closeTab') {
+        closeTab(activeId);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -162,6 +175,8 @@ export default function App() {
           displayValue={unified ? unified.left : undefined}
           userOverrides={unified ? compareOverrides : undefined}
           onTogglePath={unified ? toggleComparePath : undefined}
+          searchRequest={searchRequest.side === 'left' ? searchRequest.n : 0}
+          onInteract={() => (lastPaneRef.current = 'left')}
         />
         {activeTab.mode === 'compare' && (
           <>
@@ -175,6 +190,8 @@ export default function App() {
               displayValue={unified ? unified.right : undefined}
               userOverrides={unified ? compareOverrides : undefined}
               onTogglePath={unified ? toggleComparePath : undefined}
+              searchRequest={searchRequest.side === 'right' ? searchRequest.n : 0}
+              onInteract={() => (lastPaneRef.current = 'right')}
             />
           </>
         )}

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useMemo, useState } from 'react';
 import { approximateSize, countKeys, parseJson } from '../lib/parseJson';
 import { repairJson } from '../lib/repairJson';
 import {
@@ -12,6 +12,7 @@ import { SearchBar } from './SearchBar';
 import { useSearch } from '../hooks/useSearch';
 import type { DiffEntry } from '../lib/diff';
 import type { SearchMatch } from '../hooks/useSearch';
+import { SHORTCUT_LABELS } from '../lib/shortcuts';
 
 interface Props {
   label: string;
@@ -34,6 +35,10 @@ interface Props {
   /** Controlled per-node open/closed map. Shared across panes in compare mode. */
   userOverrides?: Map<string, boolean>;
   onTogglePath?: (path: string, nextOpen: boolean) => void;
+  /** A counter bumped by the ⌘/Ctrl+F shortcut; each bump opens and focuses search. */
+  searchRequest?: number;
+  /** Called when the user clicks or focuses anywhere in this pane. */
+  onInteract?: () => void;
 }
 
 export function Pane({
@@ -49,6 +54,8 @@ export function Pane({
   displayValue,
   userOverrides,
   onTogglePath,
+  searchRequest = 0,
+  onInteract,
 }: Props) {
   const parsed = useMemo(() => parseJson(raw), [raw]);
 
@@ -106,6 +113,20 @@ export function Pane({
   // Search stays over the user's own JSON — not the aligned one. Missing
   // placeholders shouldn't produce search hits on this side.
   const search = useSearch(parsed.ok ? parsed.value : null);
+
+  // React only to new requests: a pane mounting while the counter is already
+  // non-zero (e.g. the right pane appearing) shouldn't pop its search open.
+  const lastSearchRequest = useRef(searchRequest);
+  const [searchFocusTick, setSearchFocusTick] = useState(0);
+  const { open: openSearch } = search;
+  useEffect(() => {
+    if (searchRequest === lastSearchRequest.current) return;
+    lastSearchRequest.current = searchRequest;
+    if (searchRequest > 0) {
+      openSearch();
+      setSearchFocusTick((t) => t + 1);
+    }
+  }, [searchRequest, openSearch]);
 
   // "Copy all" state
   const [copied, setCopied] = useState(false);
@@ -170,7 +191,11 @@ export function Pane({
     // push this pane wider than its 50% column and bleed visually into
     // the other pane. With `min-w-0` the pane stays inside its column and
     // the inner `overflow-auto` produces a horizontal scrollbar instead.
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <div
+      className="flex min-h-0 min-w-0 flex-1 flex-col"
+      onPointerDownCapture={onInteract}
+      onFocusCapture={onInteract}
+    >
       {/* Pane header */}
       <div className="flex items-center justify-between border-b border-bg-elev bg-bg-panel px-4 py-2">
         <div className="flex items-center gap-2">
@@ -203,7 +228,7 @@ export function Pane({
           <button
             onClick={search.isOpen ? search.close : search.open}
             aria-label="Search"
-            title="Search (⌘/Ctrl + F)"
+            title={`Search (${SHORTCUT_LABELS.search})`}
             className={[
               'flex h-7 w-7 items-center justify-center rounded transition-colors',
               search.isOpen
@@ -284,7 +309,7 @@ export function Pane({
             <button
               onClick={onToggleCompare}
               aria-label="Compare"
-              title="Toggle compare mode (⌘/Ctrl + D)"
+              title={`Toggle compare mode (${SHORTCUT_LABELS.compare})`}
               className={[
                 'flex h-7 w-7 items-center justify-center rounded transition-colors',
                 isCompareMode
@@ -313,6 +338,7 @@ export function Pane({
           onNext={search.goNext}
           onPrev={search.goPrev}
           onClose={search.close}
+          focusSignal={searchFocusTick}
         />
       )}
 
