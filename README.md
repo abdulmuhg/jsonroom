@@ -2,7 +2,7 @@
 
 A quiet, ad-free room for your JSON. A viewer, formatter, fixer, and side-by-side diff tool built for debugging API responses with your team — especially when you're sharing your screen.
 
-Live at **[json.abdulmughnialfikri.com](https://jsonroom.abdulmughnialfikri.com)**. Contribute at **[github.com/abdulmuhg/jsonroom](https://github.com/abdulmuhg/jsonroom)**.
+Live at **[jsonroom.abdulmughnialfikri.com](https://jsonroom.abdulmughnialfikri.com)**. Contribute at **[github.com/abdulmuhg/jsonroom](https://github.com/abdulmuhg/jsonroom)**.
 
 ## Why this exists
 
@@ -67,7 +67,7 @@ Small, focused scope. Contributions welcome:
 
 ## Contributing
 
-PRs and issues welcome. Guiding principle: **if a feature would add more than a line of UI chrome, think twice.** JSONRoom exists to be uncluttered.
+PRs and issues welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) to get started. Guiding principle: **if a feature would add more than a line of UI chrome, think twice.** JSONRoom exists to be uncluttered.
 
 ## License
 
