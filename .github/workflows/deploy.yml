@@ -1,13 +1,15 @@
 name: Deploy
 
 # Builds the site into a container image, pushes it to GHCR, then restarts the
-# container on the server. Manual only for now (Actions, Deploy, Run workflow);
-# a push trigger is added once a manual run has gone green.
+# container on the server. Every commit to main deploys; workflow_dispatch
+# (Actions, Deploy, Run workflow) is kept for redeploying an unchanged tree.
 #
 # Not vps-stack's shared deploy-app.yml: this repo is public and vps-stack is
 # private, and GitHub lets only private repos call a private repo's reusable
 # workflows. The steps below mirror it, including verify.sh at the end.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 # Two deploys racing would leave IMAGE_TAG and the running container
