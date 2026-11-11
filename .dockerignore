@@ -1,0 +1,23 @@
+# Keep the build context to what the image needs: sources, config, lockfile.
+node_modules
+dist
+build
+.vite
+*.tsbuildinfo
+
+.git
+.github
+.claude
+.vscode
+.idea
+.vercel
+.netlify
+
+.env
+.env.*
+
+*.md
+LICENSE
+Dockerfile
+.dockerignore
+npm-debug.log*
