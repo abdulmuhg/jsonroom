@@ -1,0 +1,22 @@
+name: Bug report
+description: Something in JSONRoom doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: json
+    attributes:
+      label: Sample JSON
+      description: The smallest input that reproduces it. Strip anything sensitive.
+      render: json
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS
+      placeholder: Chrome 130 on macOS 15
