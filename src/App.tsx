@@ -9,7 +9,8 @@ import { useTheme } from './hooks/useTheme';
 import { parseJson } from './lib/parseJson';
 import { diffJson } from './lib/diff';
 import { unifyTrees } from './lib/unify';
-import { isEditableTarget, matchShortcut } from './lib/shortcuts';
+import { isEditableTarget, matchShortcut, standsDownInTextField } from './lib/shortcuts';
+import { ShortcutsDialog } from './components/ShortcutsDialog';
 
 const INTRO_SEEN_KEY = 'jsonroom.introSeen.v1';
 
@@ -49,15 +50,36 @@ export default function App() {
     n: 0,
   });
 
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const closeShortcuts = useCallback(() => setShowShortcuts(false), []);
+  // Bumped per Alt+C / Alt+↓ / Alt+↑; the left pane acts on each new request.
+  const [copyRequest, setCopyRequest] = useState(0);
+  const [foldRequest, setFoldRequest] = useState<{ mode: 'expand' | 'collapse'; n: number }>({
+    mode: 'expand',
+    n: 0,
+  });
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (showIntro) return; // Intro handles its own keys.
+      if (showIntro || showShortcuts) return; // Those overlays handle their own keys.
       const shortcut = matchShortcut(e);
       if (!shortcut) return;
-      if ((shortcut === 'newTab' || shortcut === 'closeTab') && isEditableTarget(e.target)) return;
+      if (standsDownInTextField(shortcut) && isEditableTarget(e.target)) return;
       e.preventDefault();
-      if (shortcut === 'search') {
+      if (shortcut === 'help') {
+        setShowShortcuts(true);
+      } else if (shortcut === 'nextTab' || shortcut === 'prevTab') {
+        const i = tabs.findIndex((t) => t.id === activeId);
+        const step = shortcut === 'nextTab' ? 1 : -1;
+        setActive(tabs[(i + step + tabs.length) % tabs.length].id);
+      } else if (shortcut === 'copyAll') {
+        // Compare mode has two documents, so there is no single one to copy.
+        if (activeTab.mode !== 'compare') setCopyRequest((n) => n + 1);
+      } else if (shortcut === 'expandAll' || shortcut === 'collapseAll') {
+        const mode = shortcut === 'expandAll' ? 'expand' : 'collapse';
+        setFoldRequest((r) => ({ mode, n: r.n + 1 }));
+      } else if (shortcut === 'search') {
         const side = activeTab.mode === 'compare' ? lastPaneRef.current : 'left';
         setSearchRequest((r) => ({ side, n: r.n + 1 }));
       } else if (shortcut === 'compare') {
@@ -72,7 +94,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeId, activeTab, addTab, closeTab, updateTab, showIntro]);
+  }, [tabs, activeId, activeTab, addTab, closeTab, updateTab, setActive, showIntro, showShortcuts]);
 
   // Parse both sides once per tab change so diff + unified alignment can
   // share the result without re-parsing.
@@ -143,7 +165,7 @@ export default function App() {
         {/* The single pane portals its stats and actions in here. */}
         <div ref={setToolbarSlot} className="flex flex-shrink-0 items-center" />
         <div className="flex flex-shrink-0 items-center gap-1 border-l border-bg-elev pl-1">
-          <MoreMenu onShowIntro={() => setShowIntro(true)} />
+          <MoreMenu onShowIntro={() => setShowIntro(true)} onShowShortcuts={() => setShowShortcuts(true)} />
           <ThemeSwitcher theme={theme} onChange={setTheme} />
         </div>
       </header>
@@ -170,6 +192,8 @@ export default function App() {
           onTogglePath={unified ? toggleComparePath : undefined}
           onSetOverrides={unified ? setCompareOverrides : undefined}
           searchRequest={searchRequest.side === 'left' ? searchRequest.n : 0}
+          copyRequest={copyRequest}
+          foldRequest={foldRequest}
           onInteract={() => (lastPaneRef.current = 'left')}
         />
         {activeTab.mode === 'compare' && (
@@ -192,6 +216,7 @@ export default function App() {
         )}
       </main>
 
+      {showShortcuts && <ShortcutsDialog onClose={closeShortcuts} />}
       {showIntro && <Intro onDismiss={dismissIntro} />}
     </div>
   );

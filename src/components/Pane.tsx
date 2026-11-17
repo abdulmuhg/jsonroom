@@ -41,6 +41,10 @@ interface Props {
   onSetOverrides?: (next: Map<string, boolean>) => void;
   /** A counter bumped by the ⌘/Ctrl+F shortcut; each bump opens and focuses search. */
   searchRequest?: number;
+  /** A counter bumped by Alt+C; each bump copies the whole JSON. */
+  copyRequest?: number;
+  /** Bumped by Alt+↓ / Alt+↑ (`n` is the counter); each bump expands or collapses everything. */
+  foldRequest?: { mode: 'expand' | 'collapse'; n: number };
   /** Called when the user clicks or focuses anywhere in this pane. */
   onInteract?: () => void;
   /**
@@ -66,6 +70,8 @@ export function Pane({
   onTogglePath: onTogglePathProp,
   onSetOverrides: onSetOverridesProp,
   searchRequest = 0,
+  copyRequest = 0,
+  foldRequest = { mode: 'expand', n: 0 },
   onInteract,
   toolbarSlot,
 }: Props) {
@@ -180,6 +186,22 @@ export function Pane({
     copyTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
   }, [parsed]);
 
+  // Alt+C and Alt+↓/↑ arrive as counters, like searchRequest: act only on new
+  // requests, never on the value present at mount.
+  const lastCopyRequest = useRef(copyRequest);
+  useEffect(() => {
+    if (copyRequest === lastCopyRequest.current) return;
+    lastCopyRequest.current = copyRequest;
+    handleCopyAll();
+  }, [copyRequest, handleCopyAll]);
+
+  const lastFoldN = useRef(foldRequest.n);
+  useEffect(() => {
+    if (foldRequest.n === lastFoldN.current) return;
+    lastFoldN.current = foldRequest.n;
+    if (parsed.ok && hasNested) setOverrides(buildFoldOverrides(renderValue, foldRequest.mode));
+  }, [foldRequest, parsed.ok, hasNested, renderValue, setOverrides]);
+
   // "Fix JSON" state
   const [fixMessage, setFixMessage] = useState<string | null>(null);
   const fixTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -251,7 +273,7 @@ export function Pane({
           <button
             onClick={handleCopyAll}
             aria-label="Copy all JSON"
-            title="Copy all JSON"
+            title={`Copy all JSON (${SHORTCUT_LABELS.copyAll})`}
             className={['flex h-7 w-7 items-center justify-center rounded transition-colors', copied ? 'text-accent-key' : 'text-ink-muted hover:bg-bg-hover hover:text-ink-primary'].join(' ')}
           >
             {copied ? (
@@ -270,7 +292,7 @@ export function Pane({
             <button
               onClick={() => setOverrides(buildFoldOverrides(renderValue, 'expand'))}
               aria-label="Expand all"
-              title="Expand all"
+              title={`Expand all (${SHORTCUT_LABELS.expandAll})`}
               className="flex h-7 w-7 items-center justify-center rounded transition-colors text-ink-muted hover:bg-bg-hover hover:text-ink-primary"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" width={14} height={14}>
@@ -280,7 +302,7 @@ export function Pane({
             <button
               onClick={() => setOverrides(buildFoldOverrides(renderValue, 'collapse'))}
               aria-label="Collapse all"
-              title="Collapse all"
+              title={`Collapse all (${SHORTCUT_LABELS.collapseAll})`}
               className="flex h-7 w-7 items-center justify-center rounded transition-colors text-ink-muted hover:bg-bg-hover hover:text-ink-primary"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" width={14} height={14}>
