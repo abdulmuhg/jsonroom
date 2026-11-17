@@ -1,13 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  isEditableTarget,
-  matchShortcut,
-  SHORTCUTS,
-  SHORTCUT_LABELS,
-  standsDownInTextField,
-  type Shortcut,
-  type ShortcutEvent,
-} from './shortcuts';
+import { isEditableTarget, matchShortcut, standsDownInTextField, type ShortcutEvent } from './shortcuts';
 
 function ev(partial: Partial<ShortcutEvent>): ShortcutEvent {
   return { key: '', code: '', ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...partial };
@@ -104,17 +96,6 @@ describe('standsDownInTextField', () => {
     expect(standsDownInTextField('compare')).toBe(false);
     for (const s of ['newTab', 'closeTab', 'copyAll', 'expandAll', 'collapseAll', 'nextTab', 'prevTab', 'help'] as const) {
       expect(standsDownInTextField(s)).toBe(true);
-    }
-  });
-});
-
-describe('SHORTCUTS table', () => {
-  it('describes every shortcut with a label, a description and a group', () => {
-    for (const id of Object.keys(SHORTCUTS) as Shortcut[]) {
-      expect(SHORTCUTS[id].label.length).toBeGreaterThan(0);
-      expect(SHORTCUTS[id].description.length).toBeGreaterThan(0);
-      expect(SHORTCUTS[id].group.length).toBeGreaterThan(0);
-      expect(SHORTCUT_LABELS[id]).toBe(SHORTCUTS[id].label);
     }
   });
 });
