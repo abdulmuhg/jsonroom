@@ -31,7 +31,7 @@ JSONRoom is hosted by **Mr. J** — a polite fellow who opens the door when you 
 - Search with keyboard navigation, case-sensitive toggle, and match highlighting
 - Multi-tab workspace with localStorage persistence
 - Side-by-side compare with clear diff highlights
-- Keyboard shortcuts: `⌘F` / `Ctrl+F` to search the pane you last clicked, `⌘D` / `Ctrl+D` to toggle compare, `Alt+T` / `Option+T` for a new tab, `Alt+W` / `Option+W` to close the tab (browsers keep `Ctrl+T` and `Ctrl+W` for themselves; the tab shortcuts pause while you're typing in a text field)
+- Keyboard shortcuts: `⌘F` / `Ctrl+F` to search the pane you last clicked, `⌘D` / `Ctrl+D` to toggle compare, `Alt+T` / `Option+T` for a new tab, `Alt+W` / `Option+W` to close the tab (browsers keep `Ctrl+T` and `Ctrl+W` for themselves; the Alt shortcuts pause while you're typing in a text field), `Alt+]` / `Alt+[` for the next / previous tab, `Alt+C` to copy all JSON, `Alt+↓` / `Alt+↑` to expand / collapse all, and `?` for the full list
 - Zero ads, zero tracking, zero sign-up — everything runs locally in your browser
 
 ## Tech stack

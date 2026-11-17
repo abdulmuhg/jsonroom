@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { isEditableTarget, matchShortcut, type ShortcutEvent } from './shortcuts';
+import {
+  isEditableTarget,
+  matchShortcut,
+  SHORTCUTS,
+  SHORTCUT_LABELS,
+  standsDownInTextField,
+  type Shortcut,
+  type ShortcutEvent,
+} from './shortcuts';
 
 function ev(partial: Partial<ShortcutEvent>): ShortcutEvent {
   return { key: '', code: '', ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, ...partial };
@@ -55,6 +63,59 @@ describe('matchShortcut', () => {
   it('ignores plain keys', () => {
     expect(matchShortcut(ev({ key: 'f', code: 'KeyF' }))).toBeNull();
     expect(matchShortcut(ev({ key: 't', code: 'KeyT' }))).toBeNull();
+  });
+});
+
+describe('matchShortcut: view and tab shortcuts', () => {
+  it('maps Alt+C to copy all', () => {
+    expect(matchShortcut(ev({ key: 'c', code: 'KeyC', altKey: true }))).toBe('copyAll');
+    expect(matchShortcut(ev({ key: 'ç', code: 'KeyC', altKey: true }))).toBe('copyAll');
+  });
+
+  it('maps Alt+Down to expand all and Alt+Up to collapse all', () => {
+    expect(matchShortcut(ev({ key: 'ArrowDown', code: 'ArrowDown', altKey: true }))).toBe('expandAll');
+    expect(matchShortcut(ev({ key: 'ArrowUp', code: 'ArrowUp', altKey: true }))).toBe('collapseAll');
+  });
+
+  it('maps Alt+] and Alt+[ to the next and previous tab', () => {
+    expect(matchShortcut(ev({ key: ']', code: 'BracketRight', altKey: true }))).toBe('nextTab');
+    expect(matchShortcut(ev({ key: '[', code: 'BracketLeft', altKey: true }))).toBe('prevTab');
+    // macOS Option+[ types a curly quote; the physical key still decides.
+    expect(matchShortcut(ev({ key: '“', code: 'BracketLeft', altKey: true }))).toBe('prevTab');
+  });
+
+  it('maps ? to help, with or without Shift', () => {
+    expect(matchShortcut(ev({ key: '?', code: 'Slash', shiftKey: true }))).toBe('help');
+    expect(matchShortcut(ev({ key: '?', code: 'Slash' }))).toBe('help');
+  });
+
+  it('does not fire the new shortcuts with other modifiers', () => {
+    expect(matchShortcut(ev({ key: 'c', code: 'KeyC', altKey: true, shiftKey: true }))).toBeNull();
+    expect(matchShortcut(ev({ key: 'ArrowDown', code: 'ArrowDown', altKey: true, ctrlKey: true }))).toBeNull();
+    expect(matchShortcut(ev({ key: 'ArrowDown', code: 'ArrowDown' }))).toBeNull();
+    expect(matchShortcut(ev({ key: '?', code: 'Slash', ctrlKey: true }))).toBeNull();
+    expect(matchShortcut(ev({ key: 'c', code: 'KeyC', ctrlKey: true }))).toBeNull();
+  });
+});
+
+describe('standsDownInTextField', () => {
+  it('lets only search and compare through while typing', () => {
+    expect(standsDownInTextField('search')).toBe(false);
+    expect(standsDownInTextField('compare')).toBe(false);
+    for (const s of ['newTab', 'closeTab', 'copyAll', 'expandAll', 'collapseAll', 'nextTab', 'prevTab', 'help'] as const) {
+      expect(standsDownInTextField(s)).toBe(true);
+    }
+  });
+});
+
+describe('SHORTCUTS table', () => {
+  it('describes every shortcut with a label, a description and a group', () => {
+    for (const id of Object.keys(SHORTCUTS) as Shortcut[]) {
+      expect(SHORTCUTS[id].label.length).toBeGreaterThan(0);
+      expect(SHORTCUTS[id].description.length).toBeGreaterThan(0);
+      expect(SHORTCUTS[id].group.length).toBeGreaterThan(0);
+      expect(SHORTCUT_LABELS[id]).toBe(SHORTCUTS[id].label);
+    }
   });
 });
 

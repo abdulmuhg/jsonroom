@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import { SHORTCUT_LABELS } from '../lib/shortcuts';
 
 interface Props {
   onShowIntro: () => void;
+  onShowShortcuts: () => void;
 }
 
 /** Overflow menu for rarely used links, so they stay out of the main row. */
-export function MoreMenu({ onShowIntro }: Props) {
+export function MoreMenu({ onShowIntro, onShowShortcuts }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -54,8 +56,19 @@ export function MoreMenu({ onShowIntro }: Props) {
         <div
           role="menu"
           aria-label="More"
-          className="absolute right-0 top-full z-40 mt-1.5 w-40 overflow-hidden rounded-md border border-bg-elev bg-bg-panel shadow-xl"
+          className="absolute right-0 top-full z-40 mt-1.5 w-48 overflow-hidden rounded-md border border-bg-elev bg-bg-panel shadow-xl"
         >
+          <button
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onShowShortcuts();
+            }}
+            className={`${itemClass} justify-between`}
+          >
+            Keyboard shortcuts
+            <kbd className="font-mono text-[11px] text-ink-muted">{SHORTCUT_LABELS.help}</kbd>
+          </button>
           <button
             role="menuitem"
             onClick={() => {
