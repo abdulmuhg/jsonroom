@@ -168,6 +168,7 @@ export default function App() {
           displayValue={unified ? unified.left : undefined}
           userOverrides={unified ? compareOverrides : undefined}
           onTogglePath={unified ? toggleComparePath : undefined}
+          onSetOverrides={unified ? setCompareOverrides : undefined}
           searchRequest={searchRequest.side === 'left' ? searchRequest.n : 0}
           onInteract={() => (lastPaneRef.current = 'left')}
         />
@@ -183,6 +184,7 @@ export default function App() {
               displayValue={unified ? unified.right : undefined}
               userOverrides={unified ? compareOverrides : undefined}
               onTogglePath={unified ? toggleComparePath : undefined}
+              onSetOverrides={unified ? setCompareOverrides : undefined}
               searchRequest={searchRequest.side === 'right' ? searchRequest.n : 0}
               onInteract={() => (lastPaneRef.current = 'right')}
             />

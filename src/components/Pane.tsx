@@ -8,6 +8,7 @@ import {
   renameKeyAtPath,
   addChildAtPath,
 } from '../lib/editPath';
+import { buildFoldOverrides } from '../lib/fold';
 import { JsonView } from './JsonView';
 import { SearchBar } from './SearchBar';
 import { useSearch } from '../hooks/useSearch';
@@ -36,6 +37,8 @@ interface Props {
   /** Controlled per-node open/closed map. Shared across panes in compare mode. */
   userOverrides?: Map<string, boolean>;
   onTogglePath?: (path: string, nextOpen: boolean) => void;
+  /** Replaces the controlled override map in one go (Expand all / Collapse all). */
+  onSetOverrides?: (next: Map<string, boolean>) => void;
   /** A counter bumped by the ⌘/Ctrl+F shortcut; each bump opens and focuses search. */
   searchRequest?: number;
   /** Called when the user clicks or focuses anywhere in this pane. */
@@ -59,8 +62,9 @@ export function Pane({
   onToggleCompare,
   diffCount,
   displayValue,
-  userOverrides,
-  onTogglePath,
+  userOverrides: userOverridesProp,
+  onTogglePath: onTogglePathProp,
+  onSetOverrides: onSetOverridesProp,
   searchRequest = 0,
   onInteract,
   toolbarSlot,
@@ -117,6 +121,26 @@ export function Pane({
   // The value the JSON tree renders. In compare mode this is the aligned
   // value (with MISSING placeholders); otherwise it's the parsed value itself.
   const renderValue = displayValue !== undefined ? displayValue : parsed.ok ? parsed.value : null;
+
+  // Open/closed state. The parent owns it in compare mode so both panes stay
+  // in step; otherwise this pane keeps its own.
+  const [localOverrides, setLocalOverrides] = useState<Map<string, boolean>>(() => new Map());
+  const userOverrides = userOverridesProp ?? localOverrides;
+  const setOverrides = onSetOverridesProp ?? setLocalOverrides;
+  const onTogglePath = useCallback(
+    (path: string, nextOpen: boolean) => {
+      if (onTogglePathProp) {
+        onTogglePathProp(path, nextOpen);
+        return;
+      }
+      setLocalOverrides((prev) => new Map(prev).set(path, nextOpen));
+    },
+    [onTogglePathProp],
+  );
+  const hasNested = useMemo(
+    () => buildFoldOverrides(renderValue, 'expand').size > 1,
+    [renderValue],
+  );
 
   // Search stays over the user's own JSON — not the aligned one. Missing
   // placeholders shouldn't produce search hits on this side.
@@ -240,6 +264,30 @@ export function Pane({
           </svg>
             )}
           </button>
+        )}
+        {parsed.ok && hasNested && (
+          <>
+            <button
+              onClick={() => setOverrides(buildFoldOverrides(renderValue, 'expand'))}
+              aria-label="Expand all"
+              title="Expand all"
+              className="flex h-7 w-7 items-center justify-center rounded transition-colors text-ink-muted hover:bg-bg-hover hover:text-ink-primary"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" width={14} height={14}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m7.5 4.5 4.5 4.5 4.5-4.5M7.5 19.5l4.5-4.5 4.5 4.5" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setOverrides(buildFoldOverrides(renderValue, 'collapse'))}
+              aria-label="Collapse all"
+              title="Collapse all"
+              className="flex h-7 w-7 items-center justify-center rounded transition-colors text-ink-muted hover:bg-bg-hover hover:text-ink-primary"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" width={14} height={14}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m7.5 9 4.5-4.5L16.5 9M7.5 15l4.5 4.5 4.5-4.5" />
+              </svg>
+            </button>
+          </>
         )}
         {parsed.ok && (
           <button

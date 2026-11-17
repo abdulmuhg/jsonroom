@@ -15,13 +15,9 @@ interface Props {
   expandPaths?: Set<string>;
   query?: string;
   caseSensitive?: boolean;
-  /**
-   * When provided, the view becomes "controlled" for per-node expand/collapse
-   * state. The parent owns the map and gets notified of toggles. Used by the
-   * compare-mode Panes so both sides mirror each other's expand state.
-   */
-  userOverrides?: Map<string, boolean>;
-  onTogglePath?: (path: string, nextOpen: boolean) => void;
+  /** Per-node open/closed state. The parent owns the map and gets notified of toggles. */
+  userOverrides: Map<string, boolean>;
+  onTogglePath: (path: string, nextOpen: boolean) => void;
   /**
    * Edit callbacks. When provided, primitive values become click-to-edit
    * inputs, object keys become click-to-rename inputs, and array/object
@@ -123,40 +119,15 @@ export function JsonView({
   expandPaths,
   query,
   caseSensitive,
-  userOverrides: userOverridesProp,
-  onTogglePath: onTogglePathProp,
+  userOverrides,
+  onTogglePath,
   onEditValue,
   onRenameKey,
   onAddChild,
   onDelete,
 }: Props) {
-  // User overrides for per-node open/closed state. A path is absent until the
-  // user explicitly toggles it — then we store the new open/closed boolean.
-  // Lifted to the root so any toggle re-renders the whole tree, which is
-  // what keeps the line-number map in sync.
-  //
-  // When `userOverridesProp` / `onTogglePathProp` are provided, the view is
-  // "controlled" and delegates to the parent — used by compare-mode Panes so
-  // both sides expand/collapse together.
-  const [localOverrides, setLocalOverrides] = useState<Map<string, boolean>>(() => new Map());
-
-  const userOverrides = userOverridesProp ?? localOverrides;
-
-  const togglePath = useCallback(
-    (path: string, nextOpen: boolean) => {
-      if (onTogglePathProp) {
-        onTogglePathProp(path, nextOpen);
-        return;
-      }
-      setLocalOverrides((prev) => {
-        const next = new Map(prev);
-        next.set(path, nextOpen);
-        return next;
-      });
-    },
-    [onTogglePathProp],
-  );
-
+  // The override map is held at the root so any toggle re-renders the whole
+  // tree, which keeps the line-number map in sync.
   const lineNumbers = useMemo(
     () => computeLineNumbers(value, userOverrides, expandPaths),
     [value, userOverrides, expandPaths],
@@ -171,7 +142,7 @@ export function JsonView({
         depth={0}
         lineNumbers={lineNumbers}
         userOverrides={userOverrides}
-        onTogglePath={togglePath}
+        onTogglePath={onTogglePath}
         highlightPaths={highlightPaths}
         searchMatches={searchMatches}
         activeMatchPath={activeMatchPath}
